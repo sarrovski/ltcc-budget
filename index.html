@@ -308,6 +308,30 @@ tbody tr{transition:background .1s}
   #printSummary .k .kv{font-size:13pt; font-weight:700; font-family:Inter,Arial,sans-serif; margin-top:2pt}
 }
 
+/* admin */
+.adm-grid{display:grid; grid-template-columns:1fr 320px; gap:20px; align-items:start}
+@media (max-width:1000px){.adm-grid{grid-template-columns:1fr}}
+.sel{border:1.5px solid #C7D4CB; background:#F7FAF8; border-radius:8px; padding:6px 9px; font-size:12.5px; color:var(--ink); font-family:inherit; outline:none; cursor:pointer}
+.sel:focus{border-color:var(--pine); box-shadow:0 0 0 3px var(--pine-bg)}
+.sel.role-admin{border-color:var(--gold); background:var(--gold-bg); color:var(--gold-d); font-weight:600}
+.sel.role-owner{border-color:var(--pine); background:var(--pine-bg); color:var(--pine-d); font-weight:600}
+.avatar{width:30px; height:30px; border-radius:50%; background:var(--pine-bg); color:var(--pine-d); display:inline-flex; align-items:center; justify-content:center; font-weight:700; font-size:12px; margin-right:10px; flex:none}
+.ucell{display:flex; align-items:center; text-align:left}
+.ucell .un{font-weight:600; color:var(--ink); font-size:13px}
+.ucell .ue{font-size:11.5px; color:var(--slate)}
+.revoke{border:1px solid var(--line); background:#fff; color:var(--red); border-radius:7px; padding:5px 10px; font-size:11.5px; font-weight:600}
+.revoke:hover{border-color:var(--red); background:var(--red-bg)}
+.dept-row{display:flex; align-items:center; gap:11px; padding:11px 0; border-bottom:1px solid var(--line2)}
+.dept-row:last-child{border:none}
+.dept-ic{width:34px; height:34px; border-radius:9px; background:var(--pine-bg); color:var(--pine-d); display:flex; align-items:center; justify-content:center; flex:none}
+.dept-ic svg{width:17px; height:17px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+.dept-meta{flex:1; min-width:0}
+.dept-meta input{border:none; background:transparent; font-weight:600; font-size:13.5px; color:var(--ink); width:100%; outline:none; padding:2px 0; border-bottom:1px dashed transparent}
+.dept-meta input:focus{border-bottom-color:var(--pine)}
+.dept-meta .dm{font-size:11px; color:var(--slate)}
+.addrow{display:flex; gap:8px; margin-top:13px}
+.addrow input{flex:1; border:1.5px solid #C7D4CB; background:#F7FAF8; border-radius:8px; padding:8px 11px; font-size:13px; outline:none; color:var(--ink)}
+.addrow input:focus{border-color:var(--pine)}
 @media (prefers-reduced-motion:reduce){*{transition:none!important}}
 :focus-visible{outline:2px solid var(--teal); outline-offset:1px}
 </style>
@@ -342,6 +366,8 @@ tbody tr{transition:background .1s}
       <a data-view="planning"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg></span> Budget Planning</a>
       <a data-view="actuals"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4M4 20h16"/><path d="M8 16v-4M13 16V8M18 16v-6"/></svg></span> Plan vs Actuals</a>
       <a data-view="purchases"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h2l2 12h11l2-8H7"/><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/></svg></span> Purchase Planner</a>
+      <div class="nav-eyebrow" style="margin-top:16px" id="navAdminHead" hidden>Admin</div>
+      <a data-view="admin" id="navAdmin" hidden><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M17 9l1.2 1.2L21 7.4"/></svg></span> Admin</a>
       <div class="nav-eyebrow" style="margin-top:16px">Data</div>
       <a data-view="import"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11M8 10l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span> Import Report</a>
     </nav>
@@ -788,6 +814,68 @@ function renderPurchases(){
     </div>`;
 }
 
+let adm={users:[],depts:[],counts:{}};
+async function fetchAdmin(){
+  const [{data:users},{data:depts},{data:accts}] = await Promise.all([
+    sb.from("profiles").select("id,email,full_name,role,department_id,created_at").order("created_at"),
+    sb.from("departments").select("id,name,fiscal_year").order("name"),
+    sb.from("accounts").select("id,department_id")
+  ]);
+  adm.users=users||[]; adm.depts=depts||[];
+  adm.counts={}; (accts||[]).forEach(a=>{adm.counts[a.department_id]=(adm.counts[a.department_id]||0)+1;});
+}
+function initials(u){ const n=(u.full_name||u.email||"?").trim(); const p=n.split(/[\s@._-]+/).filter(Boolean); return ((p[0]?.[0]||"?")+(p[1]?.[0]||"")).toUpperCase(); }
+function renderAdmin(){
+  const deptOpts=id=>`<option value="">— none —</option>`+adm.depts.map(d=>`<option value="${d.id}" ${d.id===id?"selected":""}>${d.name}</option>`).join("");
+  const rows=adm.users.map(u=>{
+    const pending=!u.department_id;
+    return `<tr>
+      <td class="l"><div class="ucell"><span class="avatar">${initials(u)}</span><div><div class="un">${u.full_name||"—"}</div><div class="ue">${u.email}</div></div></div></td>
+      <td class="l"><select class="sel" data-udept="${u.id}">${deptOpts(u.department_id)}</select></td>
+      <td class="l"><select class="sel role-${u.role}" data-urole="${u.id}">
+        ${["viewer","owner","admin"].map(r=>`<option ${r===u.role?"selected":""}>${r}</option>`).join("")}</select></td>
+      <td class="l">${pending?'<span class="pill amber">Pending assignment</span>':'<span class="pill green">Active</span>'}</td>
+      <td class="num">${new Date(u.created_at).toLocaleDateString("en-US",{month:"short",day:"numeric"})}</td>
+      <td><button class="revoke" data-revoke="${u.id}">Revoke access</button></td>
+    </tr>`;
+  }).join("");
+  const drows=adm.depts.map(d=>{
+    const members=adm.users.filter(u=>u.department_id===d.id).length;
+    return `<div class="dept-row">
+      <div class="dept-ic"><svg viewBox="0 0 24 24"><path d="M3 21V8l7-5 7 5v13"/><path d="M3 21h18M9 21v-5h4v5"/></svg></div>
+      <div class="dept-meta"><input value="${d.name}" data-dname="${d.id}" spellcheck="false"/>
+      <div class="dm">${members} member${members!==1?"s":""} · ${adm.counts[d.id]||0} budget lines · FY ${d.fiscal_year}</div></div>
+    </div>`;
+  }).join("");
+  $("#main").innerHTML=`
+    <div class="head"><div><h1 class="display">Admin</h1>
+    <p>Manage who can access the workbook, what they can do, and which departments exist. Changes apply immediately.</p></div></div>
+    <div class="kpis">
+      ${kpi("Users", adm.users.length)}
+      ${kpi("Pending Assignment", adm.users.filter(u=>!u.department_id).length, "", adm.users.some(u=>!u.department_id)?"warn":"good")}
+      ${kpi("Departments", adm.depts.length)}
+      ${kpi("Admins", adm.users.filter(u=>u.role==="admin").length)}
+    </div>
+    <div class="adm-grid">
+      <div class="panel"><div class="panel-h"><span class="t">Users</span>
+        <span class="legend">viewer = read only · owner = can edit · admin = everything</span></div>
+        <div class="tbl-wrap"><table>
+          <thead><tr><th class="l">User</th><th class="l">Department</th><th class="l">Role</th><th class="l">Status</th><th>Joined</th><th></th></tr></thead>
+          <tbody>${rows||`<tr><td colspan="6" class="l" style="padding:24px;color:var(--slate)">No users yet — they'll appear here as soon as they sign in once.</td></tr>`}</tbody>
+        </table></div></div>
+      <div class="panel" style="padding:16px 18px">
+        <div class="panel-h" style="padding:0 0 12px; border:none"><span class="t">Departments</span></div>
+        ${drows||'<div style="color:var(--slate);font-size:12.5px">None yet.</div>'}
+        <div class="addrow"><input id="newDept" placeholder="New department name"/><button class="btn primary" id="addDept">Add</button></div>
+        <p style="font-size:11px;color:var(--slate);margin:12px 0 0;line-height:1.5">Rename by editing a name and pressing Enter. New sign-ups stay “pending” until you assign them here.</p>
+      </div>
+    </div>`;
+}
+async function admSetProfile(id, patch, label){
+  const { error } = await sb.from("profiles").update(patch).eq("id",id);
+  if(error){ toast("Failed: "+error.message); return; }
+  await fetchAdmin(); renderAdmin(); toast(label);
+}
 function renderImport(){
   $("#main").innerHTML=`
     <div class="head"><div><h1 class="display">Import Report</h1>
@@ -883,7 +971,7 @@ function download(name,content,type){
 /* ---------- render router ---------- */
 function render(){
   document.querySelectorAll("#nav a").forEach(a=>a.classList.toggle("on",a.dataset.view===state.view));
-  ({dashboard:renderDashboard, planning:renderPlanning, actuals:renderActuals, purchases:renderPurchases, import:renderImport}[state.view])();
+  ({dashboard:renderDashboard, planning:renderPlanning, actuals:renderActuals, purchases:renderPurchases, import:renderImport, admin:renderAdmin}[state.view])();
   animateKPIs();
 }
 function go(v){ state.view=v; render(); window.scrollTo(0,0); }
@@ -921,6 +1009,18 @@ document.addEventListener("click",async e=>{
   if(e.target.id==="noteSave"){ saveNote(); return; }
   if(e.target.id==="noteDelete"){ deleteNote(); return; }
   if(e.target.id==="noteCancel" || e.target.id==="noteModal"){ closeNote(); return; }
+  if(e.target.id==="addDept"){
+    const name=($("#newDept").value||"").trim(); if(!name){ toast("Give the department a name"); return; }
+    const { error } = await sb.from("departments").insert({ name });
+    if(error){ toast("Failed: "+error.message); return; }
+    await fetchAdmin(); renderAdmin(); toast("Department created");
+    return;
+  }
+  const rv=e.target.closest("[data-revoke]");
+  if(rv){ const u=adm.users.find(x=>x.id===rv.dataset.revoke);
+    if(confirm(`Revoke access for ${u?.email}? They'll stay signed up but see nothing until reassigned.`))
+      admSetProfile(rv.dataset.revoke,{department_id:null,role:"viewer"},"Access revoked");
+    return; }
   const del=e.target.closest("[data-del]"); if(del){ const rem=state.purchases.splice(+del.dataset.del,1)[0]; if(cloud.on) cloudDelPurchase(rem); else save(); renderPurchases(); }
 });
 document.addEventListener("input",e=>{
@@ -933,6 +1033,12 @@ document.addEventListener("input",e=>{
 });
 document.addEventListener("focusin",e=>{ if(e.target.classList&&e.target.classList.contains("mo-input")) e.target.select(); });
 document.addEventListener("keydown",e=>{
+  if(e.key==="Enter"&&e.target.dataset&&e.target.dataset.dname){
+    e.preventDefault();
+    sb.from("departments").update({name:e.target.value.trim()}).eq("id",e.target.dataset.dname)
+      .then(({error})=>{ if(error) toast("Rename failed: "+error.message); else { toast("Department renamed"); fetchAdmin(); } });
+    e.target.blur(); return;
+  }
   if(e.key==="Escape"){ closeNote(); return; }
   if(e.target.classList&&e.target.classList.contains("mo-input")&&["ArrowUp","ArrowDown","Enter"].includes(e.key)){
     e.preventDefault();
@@ -944,6 +1050,8 @@ document.addEventListener("keydown",e=>{
 $("#deptIn").addEventListener("input",e=>{ state.dept=e.target.value||"Department"; save(); });
 $("#jsonIn")?.addEventListener("change",()=>{});
 document.addEventListener("change",e=>{
+  if(e.target.dataset&&e.target.dataset.udept!==undefined){ admSetProfile(e.target.dataset.udept,{department_id:e.target.value||null},"Department updated"); return; }
+  if(e.target.dataset&&e.target.dataset.urole!==undefined){ admSetProfile(e.target.dataset.urole,{role:e.target.value},"Role updated"); return; }
   if(e.target.id==="jsonIn"){
     const f=e.target.files[0]; if(!f) return; const r=new FileReader();
     r.onload=()=>{ try{ localStorage.setItem(KEY,r.result); location.reload(); }catch(x){ toast("Couldn't read that file"); } }; r.readAsText(f);
@@ -1039,6 +1147,7 @@ async function boot(){
   cloud.on=true; cloud.profile=prof; cloud.deptId=prof.department_id;
   state.dept=prof.departments?.name||"Department"; state.fy=prof.departments?.fiscal_year||state.fy;
   if(prof.role==="viewer") document.body.classList.add("viewer");
+  if(prof.role==="admin"){ $("#navAdmin").hidden=false; $("#navAdminHead").hidden=false; await fetchAdmin(); }
   await fetchAll();
   showApp();
   const di=$("#deptIn"); di.value=state.dept; di.readOnly=true;
