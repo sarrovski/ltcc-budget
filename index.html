@@ -318,6 +318,35 @@ tbody tr{transition:background .1s}
   #printSummary .k .kv{font-size:13pt; font-weight:700; font-family:Inter,Arial,sans-serif; margin-top:2pt}
 }
 
+/* expandable planning rows */
+tr.prow{cursor:pointer}
+table.plan-table{table-layout:fixed; width:100%}
+table.plan-table .c1{width:178px} table.plan-table .c3{width:158px} table.plan-table .cn{width:92px}
+table.plan-table .c7{width:100px} table.plan-table .c8{width:74px} table.plan-table .c9{width:82px}
+@media (max-width:1180px){
+  table.plan-table .c1{width:132px} table.plan-table .c3{width:44px} table.plan-table .cn{width:84px}
+  table.plan-table .c9{width:0} table.plan-table td:nth-child(9), table.plan-table th:nth-child(9){display:none}
+  table.plan-table .cat span:last-child{display:none}  /* icon-only category */
+}
+table.plan-table td, table.plan-table th{overflow:hidden; text-overflow:ellipsis}
+table.plan-table tr.prow td{white-space:nowrap}
+tr.prow:hover td{background:#F6FAF7}
+tr.prow.open td{background:var(--pine-bg); border-bottom-color:transparent}
+.chev{display:inline-flex; width:20px; height:20px; align-items:center; justify-content:center; border-radius:6px; color:var(--slate2); margin-right:6px; transition:transform .15s; flex:none}
+.chev svg{width:13px; height:13px; stroke:currentColor; fill:none; stroke-width:2; stroke-linecap:round; stroke-linejoin:round}
+tr.prow.open .chev{transform:rotate(90deg); color:var(--pine)}
+tr.xrow>td{background:#F8FBF9; padding:16px 18px 18px; border-bottom:2px solid var(--pine-bg)}
+.mgrid{display:grid; grid-template-columns:repeat(6,1fr); gap:10px 12px; max-width:860px}
+@media (max-width:1100px){.mgrid{grid-template-columns:repeat(4,1fr)}}
+@media (max-width:700px){.mgrid{grid-template-columns:repeat(3,1fr)}}
+.mcell label{display:block; font-size:9.5px; letter-spacing:.09em; text-transform:uppercase; color:var(--slate); font-weight:700; margin-bottom:4px}
+.mcell .mo-input{width:100%}
+.mcell .locked-val{display:block; background:var(--line2); border:1px solid var(--line); border-radius:6px; padding:6px 8px; font-size:12.5px; color:var(--ink2); text-align:right}
+.xhead{display:flex; align-items:center; justify-content:space-between; gap:12px; margin-bottom:12px; flex-wrap:wrap}
+.xhead .xt{font-size:12.5px; color:var(--slate)}
+.xhead .xt b{color:var(--ink); font-variant-numeric:tabular-nums}
+.xtools{display:flex; gap:7px}
+
 /* admin */
 .adm-grid{display:grid; grid-template-columns:1fr 320px; gap:20px; align-items:start}
 @media (max-width:1000px){.adm-grid{grid-template-columns:1fr}}
@@ -546,7 +575,7 @@ function categoryCardHTML(){
 }
 
 let state = {
-  view:"dashboard", dept:"Department", fy:"2025–26", query:"", pfilter:"all",
+  view:"dashboard", dept:"Department", fy:"2025–26", query:"", pfilter:"all", xopen:null,
   accounts: SEED.map(a => ({...a, months: Array(12).fill(0), notes:""})),
   purchases: [
     {status:"Planned", desc:"Microscope replacement", type:"PO", vendor:"BioSupplyCo", code:"11-6410-6771-1242-000", amount:9200, needby:"2026-02-15", lead:45, notes:""},
@@ -701,26 +730,30 @@ function planKpiHTML(){
   return `${kpi("Expense Budget", usd(t.expBudget))}${kpi("Expense Planned", usd(t.expPlanned))}${kpi("Remaining / Over", usd(t.expBudget-t.expPlanned),"",t.expPlanned>t.expBudget?"warn":"")}${kpi("Rows to Review", t.review,"",t.review?"warn":"good")}`;
 }
 function planRowHTML(a,i){
-  const m=months(a), fx=isFixed(a), [st,cl]=status(a), os=overShort(a);
-  const cells=m.map((v,mi)=> fx
-    ? `<td class="locked num">${usd(v)}</td>`
-    : `<td><input class="mo-input num" data-i="${i}" data-m="${mi}" value="${v?(+v).toLocaleString("en-US"):""}" inputmode="numeric" aria-label="${MONTHS[mi]} ${escAttr(a.desc)}"/></td>`).join("");
+  const fx=isFixed(a), [st,cl]=status(a), os=overShort(a), open=state.xopen===i;
   const hasNote=!!(a.notes&&a.notes.trim());
-  const tools=`<div class="rowtools">
-     <button class="tbtn notebtn ${hasNote?'has':''}" data-note="${i}" title="${hasNote?escAttr(a.notes):'Add a note'}">${hasNote?'Note ●':'+ Note'}</button>
-     ${fx?'':`<button class="tbtn" data-spread="${i}" title="Spread the annual budget evenly across 12 months">Spread</button><button class="tbtn" data-clear="${i}" title="Clear all months">Clear</button>`}
-   </div>`;
-  return `<tr>
-    <td class="l mono stick c-code">${a.code}</td>
-    <td class="l stick c-desc" title="${escAttr(a.desc)}">${a.desc}</td>
+  const m=months(a);
+  const cells=MONTHS.map((mn,mi)=>`<div class="mcell"><label>${mn}</label>${fx
+    ? `<span class="locked-val num">${usd(m[mi])}</span>`
+    : `<input class="mo-input num" data-i="${i}" data-m="${mi}" value="${m[mi]?(+m[mi]).toLocaleString("en-US"):""}" inputmode="numeric" aria-label="${mn} ${escAttr(a.desc)}"/>`}</div>`).join("");
+  const xrow=open?`<tr class="xrow"><td colspan="9">
+    <div class="xhead">
+      <span class="xt">${fx?"Fixed line — spread automatically, June is the true-up month.":"Enter what you expect to spend each month."}
+        &nbsp; Planned <b id="xt${i}">${usd(planned(a))}</b> of <b>${usd(a.budget)}</b></span>
+      ${fx?"":`<span class="xtools"><button class="tbtn" data-spread="${i}">Spread evenly</button><button class="tbtn" data-clear="${i}">Clear all</button></span>`}
+    </div>
+    <div class="mgrid">${cells}</div></td></tr>`:"";
+  return `<tr class="prow ${open?"open":""}" data-x="${i}">
+    <td class="l"><span style="display:inline-flex;align-items:center"><span class="chev"><svg viewBox="0 0 24 24"><path d="M9 6l6 6-6 6"/></svg></span><span class="mono" style="font-size:11.5px;color:var(--slate)">${a.code}</span></span></td>
+    <td class="l" title="${escAttr(a.desc)}">${a.desc}</td>
     <td class="l">${catChip(a.cat)}</td>
-    ${cells}
     <td class="total num" id="pt${i}">${usd(planned(a))}</td>
     <td class="num">${usd(a.budget)}</td>
     <td class="num" id="os${i}" style="${os>0?'color:var(--red);font-weight:600':''}">${usd(os)}</td>
     <td id="stt${i}"><span class="pill ${cl}">${st}</span></td>
-    <td class="l">${tools}</td>
-  </tr>`;
+    <td class="l"><button class="tbtn notebtn ${hasNote?'has':''}" data-note="${i}" title="${hasNote?escAttr(a.notes):'Add a note'}">${hasNote?'Note ●':'+ Note'}</button></td>
+    <td>${fx?'<span class="pill gray">Locked</span>':'<span class="pill" style="background:var(--edit);color:#8a6d1a;border:1px solid var(--edit-b)">Editable</span>'}</td>
+  </tr>${xrow}`;
 }
 function renderPlanning(){
   if(cloud.on && state.accounts.length===0){
@@ -730,7 +763,7 @@ function renderPlanning(){
   const c=chipCounts();
   $("#main").innerHTML=`
     <div class="head"><div><h1 class="display">Budget Planning</h1>
-    <p>Spread each budget line across the year. Type in the <b>yellow</b> cells; fixed rows fill in automatically. Add a note to any line for context.</p></div>
+    <p>Click any line to open its month-by-month plan — no sideways scrolling. Yellow cells are yours; fixed rows fill themselves.</p></div>
     <div class="actions"><button class="btn" id="expCsv">Export CSV</button><button class="btn" id="printBtn">${icon("printer")} Print summary</button></div></div>
     <div class="kpis" id="planKpis">${planKpiHTML()}</div>
     <div class="plan-toolbar">
@@ -746,21 +779,20 @@ function renderPlanning(){
       <div class="panel-h"><span class="t">Budget lines</span>
         <span class="legend"><span><span class="dot" style="background:var(--edit);border:1px solid var(--edit-b)"></span>Editable</span>
         <span><span class="dot" style="background:#F6F8FB;border:1px solid var(--line)"></span>Locked</span></span></div>
-      <div class="tbl-wrap"><table>
-        <thead><tr><th class="l stick c-code">Account</th><th class="l stick c-desc">Description</th><th class="l">Category</th>
-        ${MONTHS.map(m=>`<th>${m}</th>`).join("")}<th>Planned</th><th>Budget</th><th>Over/Short</th><th class="l">Status</th><th class="l">Notes</th></tr></thead>
+      <div class="tbl-wrap"><table class="plan-table">
+        <colgroup><col class="c1"/><col/><col class="c3"/><col class="cn"/><col class="cn"/><col class="cn"/><col class="c7"/><col class="c8"/><col class="c9"/></colgroup>
+        <thead><tr><th class="l">Account</th><th class="l">Description</th><th class="l">Category</th><th>Planned</th><th>Budget</th><th>Over/Short</th><th class="l">Status</th><th class="l">Note</th><th class="l">Type</th></tr></thead>
         <tbody id="planBody"></tbody>
         <tfoot><tr><td class="l" colspan="3">Total shown</td>
-        ${MONTHS.map((_,mi)=>`<td class="num" id="ft${mi}"></td>`).join("")}
-        <td class="num" id="ftp"></td><td class="num" id="ftb"></td><td></td><td></td><td></td></tr></tfoot>
+        <td class="num" id="ftp"></td><td class="num" id="ftb"></td><td class="num" id="fto"></td><td></td><td></td><td></td></tr></tfoot>
       </table></div>
     </div>`;
   fillPlanRows();
 }
 function updatePlanFooter(list){
-  MONTHS.forEach((_,mi)=>{ const el=$("#ft"+mi); if(el) el.textContent=usd(list.reduce((s,x)=>s+(+months(x.a)[mi]||0),0)); });
   const fp=$("#ftp"); if(fp) fp.textContent=usd(list.reduce((s,x)=>s+planned(x.a),0));
   const fb=$("#ftb"); if(fb) fb.textContent=usd(list.reduce((s,x)=>s+x.a.budget,0));
+  const fo=$("#fto"); if(fo) fo.textContent=usd(list.reduce((s,x)=>s+overShort(x.a),0));
 }
 function fillPlanRows(){
   const list=currentPlanRows(), body=$("#planBody"); if(!body) return;
@@ -774,11 +806,14 @@ function recalcRow(i){
   const pt=$("#pt"+i); if(pt) pt.textContent=usd(planned(a));
   const os=overShort(a), oc=$("#os"+i); if(oc){ oc.textContent=usd(os); oc.style.cssText=os>0?'color:var(--red);font-weight:600':''; }
   const [st,cl]=status(a); const se=$("#stt"+i); if(se) se.innerHTML=`<span class="pill ${cl}">${st}</span>`;
+  const xt=$("#xt"+i); if(xt) xt.textContent=usd(planned(a));
   updatePlanFooter(currentPlanRows());
   const pk=$("#planKpis"); if(pk) pk.innerHTML=planKpiHTML();
 }
-function spreadRow(i){ const a=state.accounts[i]; const per=Math.round(a.budget/12); a.months=Array(11).fill(per); a.months.push(a.budget-per*11); save(); fillPlanRows(); }
-function clearRow(i){ state.accounts[i].months=Array(12).fill(0); save(); fillPlanRows(); }
+function spreadRow(i){ const a=state.accounts[i]; const per=Math.round(a.budget/12); a.months=Array(11).fill(per); a.months.push(a.budget-per*11);
+  if(cloud.on){ a.months.forEach((v,m)=>cloudPlan(a,m,v)); } else save(); state.xopen=i; fillPlanRows(); }
+function clearRow(i){ const a=state.accounts[i]; a.months=Array(12).fill(0);
+  if(cloud.on){ a.months.forEach((v,m)=>cloudPlan(a,m,0)); } else save(); state.xopen=i; fillPlanRows(); }
 function openNote(i){ const a=state.accounts[i]; const m=$("#noteModal"); m.dataset.idx=i; $("#noteSub").textContent=a.code+" · "+a.desc; $("#noteText").value=a.notes||""; m.classList.add("show"); setTimeout(()=>$("#noteText").focus(),40); }
 function closeNote(){ $("#noteModal").classList.remove("show"); }
 function saveNote(){ const i=+$("#noteModal").dataset.idx; state.accounts[i].notes=$("#noteText").value.trim(); if(cloud.on) cloudNotes(state.accounts[i]); else save(); closeNote(); if(state.view==="planning") fillPlanRows(); toast("Note saved"); }
@@ -1052,10 +1087,12 @@ document.addEventListener("click",async e=>{
     if(cloud.on) cloudAddPurchase(np); else save();
     renderPurchases(); toast("Purchase added");
   }
-  const chip=e.target.closest("[data-chip]"); if(chip){ state.pfilter=chip.dataset.chip; renderPlanning(); return; }
+  const chip=e.target.closest("[data-chip]"); if(chip){ state.pfilter=chip.dataset.chip; state.xopen=null; renderPlanning(); return; }
   const sp=e.target.closest("[data-spread]"); if(sp){ spreadRow(+sp.dataset.spread); return; }
   const cr=e.target.closest("[data-clear]"); if(cr){ clearRow(+cr.dataset.clear); return; }
-  const nb=e.target.closest("[data-note]"); if(nb){ openNote(+nb.dataset.note); return; }
+  const nb=e.target.closest("[data-note]"); if(nb){ e.stopPropagation(); openNote(+nb.dataset.note); return; }
+  const pr=e.target.closest("tr.prow"); if(pr && !e.target.closest("button") && !e.target.closest("input")){
+    const i=+pr.dataset.x; state.xopen = state.xopen===i ? null : i; fillPlanRows(); return; }
   if(e.target.id==="noteSave"){ saveNote(); return; }
   if(e.target.id==="noteDelete"){ deleteNote(); return; }
   if(e.target.id==="noteCancel" || e.target.id==="noteModal"){ closeNote(); return; }
@@ -1079,7 +1116,7 @@ document.addEventListener("input",e=>{
     state.accounts[i].months[m]=+e.target.value.replace(/[^0-9.-]/g,"")||0;
     recalcRow(i); if(cloud.on){ cloudPlan(state.accounts[i], m, state.accounts[i].months[m]); } else queueSave();
   }
-  if(e.target.id==="planSearch"){ state.query=e.target.value; clearTimeout(window._srchT); window._srchT=setTimeout(fillPlanRows,140); }
+  if(e.target.id==="planSearch"){ state.query=e.target.value; state.xopen=null; clearTimeout(window._srchT); window._srchT=setTimeout(fillPlanRows,140); }
 });
 document.addEventListener("focusin",e=>{ if(e.target.classList&&e.target.classList.contains("mo-input")){ const i=+e.target.dataset.i,m=+e.target.dataset.m; const v=state.accounts[i]?.months[m]; e.target.value=v||""; e.target.select(); } });
 document.addEventListener("focusout",e=>{ if(e.target.classList&&e.target.classList.contains("mo-input")){ const i=+e.target.dataset.i,m=+e.target.dataset.m; const v=state.accounts[i]?.months[m]; if(v) e.target.value=(+v).toLocaleString("en-US"); } });
