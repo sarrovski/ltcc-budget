@@ -1,0 +1,1038 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>LTCC Budget — Department Planning</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fraunces:opsz,wght@9..144,400;9..144,500;9..144,600&display=swap" rel="stylesheet" />
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
+<style>
+/* auth gate */
+.gate{position:fixed; inset:0; background:linear-gradient(184deg,#134026,#0C2C1D); display:flex; align-items:center; justify-content:center; z-index:100; padding:20px}
+.gate .card-g{background:var(--card); border-radius:16px; box-shadow:0 30px 80px rgba(0,0,0,.4); width:min(400px,100%); padding:30px 30px 26px; text-align:center}
+.gate .crest{justify-content:center; margin-bottom:14px}
+.gate .crest .mark{color:var(--ink)}
+.gate h2{font-family:"Fraunces",serif; font-weight:500; font-size:21px; margin:0 0 6px; color:var(--ink)}
+.gate p{font-size:13px; color:var(--slate); margin:0 0 18px; line-height:1.55}
+.gate input{width:100%; border:1px solid var(--line); border-radius:9px; padding:11px 13px; font-size:14px; outline:none; margin-bottom:10px; color:var(--ink)}
+.gate input:focus{border-color:var(--pine)}
+.gate .btn.primary{width:100%; padding:11px; font-size:13.5px; justify-content:center}
+.gate .msg{font-size:12.5px; margin-top:12px; color:var(--pine); font-weight:600; min-height:16px}
+.gate .msg.err{color:var(--red)}
+.gate .signout{margin-top:14px; font-size:12px; color:var(--slate); background:none; border:none; text-decoration:underline}
+.rolechip{font-size:10px; letter-spacing:.08em; text-transform:uppercase; color:var(--gold); font-weight:700; margin-top:6px}
+body.viewer .mo-input, body.viewer .pform input, body.viewer .pform select{pointer-events:none; opacity:.65; background:var(--line2); border-color:var(--line)}
+body.viewer #addP, body.viewer [data-del], body.viewer [data-spread], body.viewer [data-clear], body.viewer #parseBtn{display:none}
+</style>
+:root{
+  --ink:#0F2A1E; --ink2:#274A3B; --slate:#5E6B63; --slate2:#93A29A;
+  --teal:#14613C; --teal-d:#0F4A2E; --teal-bg:#E7F0EA;      /* LTCC pine green (primary) */
+  --pine:#14613C; --pine-d:#0F4A2E; --pine-bg:#E7F0EA;
+  --tahoe:#17548C; --tahoe-bg:#E7EFF7;                        /* Tahoe blue */
+  --steel:#3A6E8F; --steel-bg:#E9EFF4;
+  --gold:#C0902F; --gold-d:#9C7220; --gold-bg:#F6ECD6;        /* alpine gold */
+  --paper:#F1F5F2; --card:#FFFFFF; --line:#E1E9E4; --line2:#EDF2EE;
+  --red:#B4232F; --red-bg:#FBE7E9; --amber:#8A5A12; --amber-bg:#F7ECD6;
+  --green:#14613C; --green-bg:#E7F0EA; --edit:#FFFBEC; --edit-b:#EAD9A6;
+  --shadow:0 1px 2px rgba(15,42,30,.05), 0 10px 26px rgba(15,42,30,.06);
+}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0}
+body{
+  font-family:"Inter",system-ui,-apple-system,Segoe UI,Roboto,sans-serif;
+  background:var(--paper); color:var(--ink); font-size:14px; line-height:1.45;
+  -webkit-font-smoothing:antialiased;
+}
+.display{font-family:"Fraunces",Georgia,serif;}
+.num{font-variant-numeric:tabular-nums; font-feature-settings:"tnum" 1;}
+button{font-family:inherit; cursor:pointer}
+input{font-family:inherit}
+a{color:inherit}
+
+/* layout */
+.app{display:grid; grid-template-columns:246px 1fr; min-height:100vh}
+.side{background:var(--ink); color:#D6E4DC; padding:22px 16px; position:sticky; top:0; height:100vh; display:flex; flex-direction:column; gap:26px}
+.brand{display:flex; align-items:baseline; gap:9px}
+.brand .mark{font-family:"Fraunces",serif; font-size:25px; font-weight:600; color:#fff; letter-spacing:-.01em}
+.brand .sub{font-size:10px; letter-spacing:.14em; text-transform:uppercase; color:#8DB09E}
+.dept-box{background:#123B27; border:1px solid #1D4A34; border-radius:9px; padding:11px 12px}
+.dept-box label{display:block; font-size:9.5px; letter-spacing:.13em; text-transform:uppercase; color:#8DB09E; margin-bottom:4px}
+.dept-box input{width:100%; background:transparent; border:none; color:#fff; font-size:13.5px; font-weight:600; padding:0; outline:none}
+.dept-box input:focus{color:#fff}
+.dept-box .fy{margin-top:9px; font-size:11px; color:#A7C3B5}
+nav{display:flex; flex-direction:column; gap:2px}
+.nav-eyebrow{font-size:9.5px; letter-spacing:.14em; text-transform:uppercase; color:#6C9280; margin:0 8px 8px}
+#nav a{display:flex; align-items:center; gap:11px; padding:9px 12px; border-radius:8px; font-size:13.5px; font-weight:500; color:#C6D8CE; text-decoration:none; transition:background .12s,color .12s}
+#nav a .ic{width:16px; height:16px; flex:none; opacity:.85}
+#nav a:hover{background:#123B27; color:#fff}
+#nav a.on{background:var(--teal); color:#fff}
+#nav a.on .ic{opacity:1}
+.side .foot{margin-top:auto; font-size:10.5px; color:#6C9280; line-height:1.5}
+
+.main{min-width:0; padding:26px 30px 60px}
+.head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:22px; flex-wrap:wrap}
+.head h1{font-family:"Fraunces",serif; font-weight:500; font-size:30px; margin:0; letter-spacing:-.01em; color:var(--ink)}
+.head p{margin:5px 0 0; color:var(--slate); font-size:13px; max-width:60ch}
+.head .actions{display:flex; gap:8px; flex-wrap:wrap}
+.btn{border:1px solid var(--line); background:var(--card); color:var(--ink2); border-radius:8px; padding:8px 13px; font-size:12.5px; font-weight:600; box-shadow:var(--shadow); display:inline-flex; align-items:center; gap:7px}
+.btn:hover{border-color:#c9d4e2}
+.btn.primary{background:var(--teal); border-color:var(--teal); color:#fff}
+.btn.primary:hover{background:var(--teal-d)}
+.btn.ghost{box-shadow:none; background:transparent}
+
+/* KPI cards */
+.kpis{display:grid; grid-template-columns:repeat(auto-fit,minmax(160px,1fr)); gap:14px; margin-bottom:24px}
+.kpi{background:var(--card); border:1px solid var(--line); border-radius:13px; padding:15px 16px; box-shadow:var(--shadow); position:relative; overflow:hidden}
+.kpi .lab{font-size:10.5px; letter-spacing:.1em; text-transform:uppercase; color:var(--slate2); font-weight:600}
+.kpi .val{font-size:25px; font-weight:600; margin-top:7px; letter-spacing:-.02em; color:var(--ink)}
+.kpi .val.sm{font-size:19px}
+.kpi .cap{font-size:11.5px; color:var(--slate); margin-top:3px}
+.kpi .accent{position:absolute; left:0; top:0; bottom:0; width:3px; background:var(--teal)}
+.kpi.warn .accent{background:var(--red)} .kpi.warn .val{color:var(--red)}
+.kpi.good .accent{background:var(--green)}
+
+/* fiscal meter (signature) */
+.meter-card{background:var(--card); border:1px solid var(--line); border-radius:13px; padding:19px 20px; box-shadow:var(--shadow); margin-bottom:24px}
+.meter-top{display:flex; justify-content:space-between; align-items:baseline; margin-bottom:15px}
+.meter-top .t{font-family:"Fraunces",serif; font-size:17px; color:var(--ink)}
+.meter-top .s{font-size:12px; color:var(--slate)}
+.meter{position:relative; height:34px; background:var(--line2); border-radius:8px; overflow:hidden}
+.meter .spend{position:absolute; left:0; top:0; bottom:0; background:linear-gradient(90deg,var(--teal),#2fa093); border-radius:8px 0 0 8px; transition:width .5s}
+.meter .yearline{position:absolute; top:-5px; bottom:-5px; width:2px; background:var(--ink); z-index:3}
+.meter .yearline::after{content:attr(data-lab); position:absolute; top:-17px; left:50%; transform:translateX(-50%); font-size:9.5px; font-weight:700; color:var(--ink); white-space:nowrap; letter-spacing:.03em}
+.meter-legend{display:flex; gap:20px; margin-top:13px; font-size:11.5px; color:var(--slate)}
+.meter-legend b{color:var(--ink); font-weight:600}
+.dot{display:inline-block; width:9px; height:9px; border-radius:50%; margin-right:6px; vertical-align:middle}
+
+/* tables */
+.panel{background:var(--card); border:1px solid var(--line); border-radius:13px; box-shadow:var(--shadow); overflow:hidden}
+.panel-h{display:flex; justify-content:space-between; align-items:center; padding:14px 18px; border-bottom:1px solid var(--line2)}
+.panel-h .t{font-family:"Fraunces",serif; font-size:17px; color:var(--ink)}
+.panel-h .legend{display:flex; gap:14px; font-size:11px; color:var(--slate); align-items:center}
+.tbl-wrap{overflow-x:auto}
+table{border-collapse:collapse; width:100%; font-size:12.5px}
+thead th{position:sticky; top:0; background:var(--ink); color:#e7eef6; font-weight:600; font-size:10.5px; letter-spacing:.03em; text-transform:uppercase; padding:9px 8px; text-align:right; white-space:nowrap; z-index:2}
+thead th.l{text-align:left}
+tbody td{padding:7px 8px; border-bottom:1px solid var(--line2); text-align:right; white-space:nowrap}
+tbody td.l{text-align:left}
+tbody tr:hover{background:#F8FAFC}
+tbody td.mono{color:var(--slate); font-size:11.5px}
+td .cat{display:inline-block; font-size:10.5px; color:var(--slate); background:var(--line2); border-radius:5px; padding:1px 7px}
+tbody td.locked{background:#F6F8FB; color:var(--ink2)}
+tbody td.total{font-weight:600; color:var(--ink); background:#F6F8FB}
+.mo-input{width:66px; text-align:right; border:1px solid var(--edit-b); background:var(--edit); border-radius:6px; padding:5px 6px; font-size:12.5px; color:var(--ink); outline:none}
+.mo-input:focus{border-color:var(--teal); box-shadow:0 0 0 2px var(--teal-bg)}
+tfoot td{padding:9px 8px; background:var(--ink); color:#fff; font-weight:600; text-align:right; font-size:12px; position:sticky; bottom:0}
+tfoot td.l{text-align:left}
+.pill{display:inline-block; font-size:10.5px; font-weight:600; padding:2px 9px; border-radius:999px; letter-spacing:.02em}
+.pill.red{background:var(--red-bg); color:var(--red)}
+.pill.amber{background:var(--amber-bg); color:var(--amber)}
+.pill.green{background:var(--green-bg); color:var(--green)}
+.pill.gray{background:var(--line2); color:var(--slate)}
+
+/* mini bar in cells */
+.usebar{display:inline-block; width:54px; height:7px; background:var(--line2); border-radius:4px; overflow:hidden; vertical-align:middle; margin-right:7px}
+.usebar i{display:block; height:100%; background:var(--teal)}
+.usebar.over i{background:var(--red)}
+
+/* purchase form */
+.pform{display:grid; grid-template-columns:repeat(auto-fit,minmax(140px,1fr)); gap:10px; padding:16px 18px; background:#F8FAFC; border-bottom:1px solid var(--line2)}
+.pform label{display:block; font-size:10px; letter-spacing:.05em; text-transform:uppercase; color:var(--slate); font-weight:600; margin-bottom:4px}
+.pform input,.pform select{width:100%; border:1px solid var(--edit-b); background:var(--edit); border-radius:7px; padding:7px 8px; font-size:13px; color:var(--ink); outline:none}
+.pform input:focus,.pform select:focus{border-color:var(--teal)}
+.pform .add{align-self:end}
+
+/* import */
+.import-grid{display:grid; grid-template-columns:1fr 300px; gap:20px}
+textarea.paste{width:100%; min-height:320px; border:1px solid var(--line); border-radius:11px; padding:14px; font-family:ui-monospace,SFMono-Regular,Menlo,monospace; font-size:12px; color:var(--ink2); resize:vertical; background:var(--card); box-shadow:var(--shadow); outline:none}
+textarea.paste:focus{border-color:var(--teal)}
+.help{background:var(--card); border:1px solid var(--line); border-radius:11px; padding:16px 18px; box-shadow:var(--shadow); font-size:12.5px; color:var(--slate); line-height:1.6}
+.help h3{margin:0 0 8px; font-family:"Fraunces",serif; font-size:16px; color:var(--ink); font-weight:500}
+.help ol{margin:0 0 4px; padding-left:18px} .help li{margin-bottom:6px}
+.toast{position:fixed; bottom:22px; left:50%; transform:translateX(-50%) translateY(60px); background:var(--ink); color:#fff; padding:11px 20px; border-radius:10px; font-size:13px; font-weight:500; box-shadow:0 10px 30px rgba(0,0,0,.25); opacity:0; transition:.3s; z-index:50}
+.toast.show{opacity:1; transform:translateX(-50%) translateY(0)}
+
+@media (max-width:860px){
+  .app{grid-template-columns:1fr}
+  .side{position:static; height:auto; flex-direction:column}
+  nav{flex-direction:row; flex-wrap:wrap}
+  .side .foot{display:none}
+  .import-grid{grid-template-columns:1fr}
+  .main{padding:20px 16px 50px}
+}
+/* planning toolbar */
+.plan-toolbar{display:flex; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom:14px}
+.search{position:relative; display:inline-block}
+.search input{border:1px solid var(--line); background:var(--card); border-radius:9px; padding:8px 12px 8px 32px; font-size:13px; width:250px; max-width:60vw; box-shadow:var(--shadow); outline:none; color:var(--ink)}
+.search input:focus{border-color:var(--teal)}
+.search::before{content:"⌕"; position:absolute; left:11px; top:50%; transform:translateY(-50%); color:var(--slate2); font-size:16px}
+.chips{display:flex; gap:6px; flex-wrap:wrap}
+.chip{border:1px solid var(--line); background:var(--card); border-radius:999px; padding:6px 13px; font-size:12px; font-weight:600; color:var(--slate); box-shadow:var(--shadow)}
+.chip.on{background:var(--ink); color:#fff; border-color:var(--ink)}
+.chip .n{opacity:.55; margin-left:6px; font-weight:500}
+.shown{margin-left:auto; font-size:12px; color:var(--slate)}
+
+/* sticky first columns */
+th.stick,td.stick{position:sticky; background:var(--card)}
+thead th.stick{z-index:5; background:var(--ink)}
+tbody td.stick{z-index:3}
+tbody tr:hover td.stick{background:#F8FAFC}
+.c-code{left:0; width:168px; min-width:168px; max-width:168px}
+.c-desc{left:168px; width:210px; min-width:210px; max-width:210px; box-shadow:1px 0 0 var(--line)}
+thead th.c-desc{box-shadow:none}
+
+/* row tools + notes */
+.rowtools{display:inline-flex; gap:4px; white-space:nowrap}
+.tbtn{border:1px solid var(--line); background:var(--card); border-radius:6px; padding:3px 8px; font-size:11px; color:var(--slate); font-weight:600; line-height:1.5}
+.tbtn:hover{border-color:var(--teal); color:var(--teal)}
+.notebtn.has{color:var(--teal); border-color:var(--teal-bg); background:var(--teal-bg)}
+
+/* note modal */
+.modal-bg{position:fixed; inset:0; background:rgba(20,48,79,.34); display:none; align-items:center; justify-content:center; z-index:60; padding:20px}
+.modal-bg.show{display:flex}
+.modal{background:var(--card); border-radius:14px; box-shadow:0 24px 64px rgba(20,48,79,.32); width:min(470px,100%); overflow:hidden}
+.modal h3{margin:0; font-family:"Fraunces",serif; font-weight:500; font-size:19px; padding:17px 19px 2px; color:var(--ink)}
+.modal .sub{padding:0 19px; color:var(--slate); font-size:12px; font-variant-numeric:tabular-nums}
+.modal textarea{display:block; width:calc(100% - 38px); margin:13px 19px; min-height:120px; border:1px solid var(--edit-b); background:var(--edit); border-radius:9px; padding:11px 12px; font-family:inherit; font-size:13.5px; color:var(--ink); resize:vertical; outline:none; line-height:1.5}
+.modal textarea:focus{border-color:var(--teal)}
+.modal-foot{display:flex; justify-content:flex-end; gap:8px; padding:0 19px 17px}
+
+/* ---- premium branding layer ---- */
+.side{background:linear-gradient(184deg,#134026 0%,#0C2C1D 78%); box-shadow:inset -1px 0 0 rgba(255,255,255,.03)}
+.crest{display:flex; align-items:center; gap:11px}
+.crest svg{width:38px; height:44px; flex:none; filter:drop-shadow(0 2px 4px rgba(0,0,0,.25))}
+.crest .mark{font-family:"Fraunces",serif; font-size:23px; font-weight:600; color:#fff; letter-spacing:.005em; line-height:1}
+.crest .sub{display:block; font-size:9px; letter-spacing:.19em; text-transform:uppercase; color:var(--gold); margin-top:3px; font-weight:600}
+.side .goldline{height:2px; background:linear-gradient(90deg,var(--gold),transparent); border-radius:2px; margin:-8px 0 0}
+#nav a .ic{width:19px; height:19px; display:inline-flex; align-items:center; justify-content:center; opacity:.9}
+#nav a svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+#nav a.on{box-shadow:0 2px 10px rgba(0,0,0,.18)}
+#nav a.on .ic{opacity:1}
+
+.kpi{transition:transform .12s, box-shadow .12s}
+.kpi:hover{transform:translateY(-1px); box-shadow:0 2px 4px rgba(15,42,30,.06),0 16px 34px rgba(15,42,30,.09)}
+.kpi .kic{position:absolute; top:14px; right:14px; color:var(--slate2)}
+.kpi .kic svg{width:19px; height:19px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+.kpi .val{padding-right:26px}
+
+/* category chip in tables */
+.cat{display:inline-flex; align-items:center; gap:6px; font-size:11px; color:var(--ink2); background:transparent; border-radius:6px; padding:2px 4px 2px 0}
+.cat .cdot{width:20px; height:20px; border-radius:6px; display:inline-flex; align-items:center; justify-content:center; flex:none}
+.cat .cdot svg{width:12px; height:12px; stroke:currentColor; fill:none; stroke-width:1.9; stroke-linecap:round; stroke-linejoin:round}
+
+/* category breakdown card */
+.catcard{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px; box-shadow:var(--shadow); margin-bottom:24px}
+.catcard .ch{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:6px}
+.catcard .ch .t{font-family:"Fraunces",serif; font-size:17px; color:var(--ink)}
+.catcard .ch .s{font-size:12px; color:var(--slate)}
+.catrow{display:flex; align-items:center; gap:13px; padding:11px 0; border-bottom:1px solid var(--line2)}
+.catrow:last-child{border:none; padding-bottom:2px}
+.catico{width:36px; height:36px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex:none}
+.catico svg{width:18px; height:18px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
+.catmeta{flex:1; min-width:0}
+.catmeta .n{font-weight:600; font-size:13px; color:var(--ink); display:flex; justify-content:space-between; gap:10px}
+.catmeta .n .amt{font-variant-numeric:tabular-nums; color:var(--ink2)}
+.catbar{height:8px; background:var(--line2); border-radius:5px; margin-top:6px; overflow:hidden}
+.catbar i{display:block; height:100%; border-radius:5px}
+.catmeta .sub{font-size:11px; color:var(--slate); margin-top:4px}
+
+/* ---- premium pass 2 ---- */
+.kpi{background:linear-gradient(180deg,#fff, #FDFEFD)}
+.kpi .val{letter-spacing:-.025em}
+#nav a.on{background:linear-gradient(135deg,var(--pine),#1B7A4C); position:relative}
+#nav a.on::after{content:""; position:absolute; left:10px; right:10px; bottom:4px; height:2px; border-radius:2px; background:linear-gradient(90deg,var(--gold),transparent)}
+tbody tr{transition:background .1s}
+.btn{transition:transform .1s, border-color .12s, background .12s}
+.btn svg{width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; flex:none}
+.btn:active{transform:translateY(1px)}
+
+/* monthly plan chart */
+.chartcard{background:var(--card); border:1px solid var(--line); border-radius:14px; padding:18px 20px 12px; box-shadow:var(--shadow); margin-bottom:24px}
+.chartcard .ch{display:flex; align-items:baseline; justify-content:space-between; margin-bottom:10px}
+.chartcard .ch .t{font-family:"Fraunces",serif; font-size:17px; color:var(--ink)}
+.chartcard .ch .s{font-size:12px; color:var(--slate)}
+.mchart{width:100%; height:170px; display:block}
+.mchart .bar{fill:var(--pine); opacity:.88; rx:3}
+.mchart .bar.future{fill:#BFD4C7}
+.mchart .mlab{font:600 10px Inter,sans-serif; fill:var(--slate); text-anchor:middle}
+.mchart .vlab{font:600 9.5px Inter,sans-serif; fill:var(--ink2); text-anchor:middle; font-variant-numeric:tabular-nums; paint-order:stroke; stroke:#fff; stroke-width:3px; stroke-linejoin:round}
+.mchart .avg{stroke:var(--gold); stroke-width:1.5; stroke-dasharray:5 4}
+.mchart .avgt{font:600 9.5px Inter,sans-serif; fill:var(--gold-d)}
+
+/* print summary */
+.printbar{display:flex; gap:8px}
+#printSummary{display:none}
+@media print{
+  @page{margin:14mm}
+  body{background:#fff}
+  .side,.head .actions,.plan-toolbar,.toast,.modal-bg{display:none!important}
+  .app{display:block}
+  .main{display:none}
+  #printSummary{display:block; font-family:Georgia,serif; color:#111}
+  #printSummary h1{font-size:22pt; margin:0 0 2pt}
+  #printSummary .psub{font-size:9.5pt; color:#444; margin-bottom:14pt}
+  #printSummary .prule{height:2.5pt; background:#14613C; margin:6pt 0 12pt; position:relative}
+  #printSummary .prule::after{content:""; position:absolute; right:0; top:0; width:60pt; height:2.5pt; background:#C0902F}
+  #printSummary table{width:100%; border-collapse:collapse; font-size:8.5pt; font-family:Inter,Arial,sans-serif}
+  #printSummary th{text-align:right; border-bottom:1.2pt solid #14613C; padding:4pt 5pt; font-size:7.5pt; letter-spacing:.06em; text-transform:uppercase}
+  #printSummary th.l, #printSummary td.l{text-align:left}
+  #printSummary td{padding:3.5pt 5pt; border-bottom:.5pt solid #ddd; text-align:right; font-variant-numeric:tabular-nums}
+  #printSummary tr.cat td{font-weight:700; background:#F0F5F1; border-bottom:1pt solid #bbb}
+  #printSummary tr.grand td{font-weight:700; border-top:1.6pt solid #14613C; border-bottom:none; font-size:9pt}
+  #printSummary .pnote{font-size:8pt; color:#555; font-style:italic}
+  #printSummary .pfoot{margin-top:16pt; font-size:8pt; color:#666; display:flex; justify-content:space-between}
+  #printSummary .kgrid{display:flex; gap:14pt; margin:0 0 14pt}
+  #printSummary .k{flex:1; border:1pt solid #cfd9d2; border-left:3pt solid #14613C; padding:6pt 8pt}
+  #printSummary .k .kl{font-size:7pt; letter-spacing:.08em; text-transform:uppercase; color:#555}
+  #printSummary .k .kv{font-size:13pt; font-weight:700; font-family:Inter,Arial,sans-serif; margin-top:2pt}
+}
+
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+:focus-visible{outline:2px solid var(--teal); outline-offset:1px}
+</style>
+</head>
+<body>
+<div class="gate" id="gate" style="display:none">
+  <div class="card-g">
+    <div class="crest"><svg viewBox="0 0 40 46" style="width:34px;height:40px"><path d="M20 1.5 L37 7.5 V22 C37 34.5 29 42.5 20 45.5 C11 42.5 3 34.5 3 22 V7.5 Z" fill="#14613C" stroke="#C0902F" stroke-width="1.6"/><path d="M6.5 30 L14.5 18.5 L19.5 25.5 L26 15.5 L33.5 30 Z" fill="#fff" opacity=".96"/><path d="M6 31.4 C10 29.4 14 33.4 20 31.4 C26 29.4 30 33.4 34 31.4 L34 36 L6 36 Z" fill="#17548C"/></svg>
+      <div><span class="mark" style="font-family:Fraunces,serif;font-size:21px;font-weight:600">LTCC</span><span class="sub" style="display:block;font-size:9px;letter-spacing:.19em;text-transform:uppercase;color:#C0902F;font-weight:600">Budget Workbook</span></div></div>
+    <div id="gateBody"></div>
+  </div>
+</div>
+<div class="app" id="appRoot" style="display:none">
+  <aside class="side">
+    <div class="crest">
+      <svg viewBox="0 0 40 46" aria-hidden="true">
+        <path d="M20 1.5 L37 7.5 V22 C37 34.5 29 42.5 20 45.5 C11 42.5 3 34.5 3 22 V7.5 Z" fill="#14613C" stroke="#C0902F" stroke-width="1.6"/>
+        <path d="M6.5 30 L14.5 18.5 L19.5 25.5 L26 15.5 L33.5 30 Z" fill="#ffffff" opacity=".96"/>
+        <path d="M6 31.4 C10 29.4 14 33.4 20 31.4 C26 29.4 30 33.4 34 31.4 L34 36 L6 36 Z" fill="#17548C"/>
+      </svg>
+      <div><span class="mark">LTCC</span><span class="sub">Budget Workbook</span></div>
+    </div>
+    <div class="goldline"></div>
+    <div class="dept-box">
+      <label for="deptIn">Department</label>
+      <input id="deptIn" type="text" value="Department" spellcheck="false" />
+      <div class="fy">Fiscal Year <b id="fyLab">2025–26</b> · Jul–Jun</div>
+    </div>
+    <nav id="nav">
+      <div class="nav-eyebrow">Manage</div>
+      <a data-view="dashboard" class="on"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg></span> Dashboard</a>
+      <a data-view="planning"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 9v11"/></svg></span> Budget Planning</a>
+      <a data-view="actuals"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V4M4 20h16"/><path d="M8 16v-4M13 16V8M18 16v-6"/></svg></span> Plan vs Actuals</a>
+      <a data-view="purchases"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M3 5h2l2 12h11l2-8H7"/><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/></svg></span> Purchase Planner</a>
+      <div class="nav-eyebrow" style="margin-top:16px">Data</div>
+      <a data-view="import"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11M8 10l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span> Import Report</a>
+    </nav>
+    <div class="foot">
+      Yellow fields are yours to edit.<br/>Everything else is calculated.<br/><br/>
+      Signed-in mode: data saves securely to the college database.
+    </div>
+  </aside>
+  <main class="main" id="main"></main>
+</div>
+<div class="toast" id="toast"></div>
+<div class="modal-bg" id="noteModal">
+  <div class="modal" role="dialog" aria-modal="true" aria-label="Add a note">
+    <h3>Note for this line</h3>
+    <div class="sub" id="noteSub"></div>
+    <textarea id="noteText" placeholder="e.g. Position frozen until spring hire · contract renews in March · one-time equipment buy"></textarea>
+    <div class="modal-foot">
+      <button class="btn ghost" id="noteDelete" style="margin-right:auto;color:var(--red)">Delete</button>
+      <button class="btn ghost" id="noteCancel">Cancel</button>
+      <button class="btn primary" id="noteSave">Save note</button>
+    </div>
+  </div>
+</div>
+
+<div id="printSummary" aria-hidden="true"></div>
+<script>
+const SEED = [{"fund": "11", "obj": "1110", "code": "11-1110-0401-1242-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 216147, "actual": 204759.92, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-0501-1262-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 204782, "actual": 114390.92, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-0835-1252-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 103189, "actual": 92869.94, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-0836-1264-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 82046, "actual": 73840.97, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-0837-1252-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 34617, "actual": 31154.85, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-0858-1252-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 34617, "actual": 31154.85, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1002-1130-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 118381, "actual": 49039.62, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1004-1116-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 103850, "actual": 93464.57, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1105-1111-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 224869, "actual": 202382.14, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1201-1252-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 101867, "actual": 91680.5, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1250-1377-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 77681, "actual": 69912.92, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1306-1279-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 49016, "actual": 44113.95, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1307-1385-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 49016, "actual": 44113.97, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1501-1121-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 86404, "actual": 77763.17, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1590-1121-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 46109, "actual": 41497.65, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1701-1251-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 366329, "actual": 329696.27, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1902-1258-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 108003, "actual": 97202.72, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1905-1256-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 204518, "actual": 184066.24, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-1914-1239-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 69233, "actual": 62309.72, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-2001-1126-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 152998, "actual": 121929.37, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-2205-1103-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 38841, "actual": 0, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-2206-1263-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 69233, "actual": 62309.7, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-2207-1118-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 38841, "actual": 0, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-2208-1115-777", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 77681, "actual": 71577.3, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-4901-1000-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 69233, "actual": 62309.7, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-4940-1100-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 133668, "actual": 120301.13, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-6110-2279-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 120281, "actual": 85497.44, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-6115-1000-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 69233, "actual": 62309.72, "enc": 0}, {"fund": "11", "obj": "1110", "code": "11-1110-6775-3100-000", "desc": "Full-Time Instructor", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 152138, "actual": 0, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6010-1000-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 113891, "actual": 106359.54, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6011-1100-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 125883, "actual": 115392.86, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6012-1200-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 8572, "actual": 7857.85, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6120-2286-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 8761, "actual": 8181.49, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6450-2207-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 40492, "actual": 37917.3, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6601-4166-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 49530, "actual": 47465.91, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6602-3178-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 68020, "actual": 63711.08, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6820-3115-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 42679, "actual": 40160.68, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6820-4166-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 17144, "actual": 15715.59, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6822-1000-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 5257, "actual": 4908.87, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6823-4166-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 17144, "actual": 13572.57, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6825-1478-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 10762, "actual": 10055.41, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6825-4166-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 4286, "actual": 2857.36, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6825-4176-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 8255, "actual": 7911.01, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6840-4166-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 8572, "actual": 7857.85, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6840-4176-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 100186, "actual": 92995.21, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6850-3180-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 18764, "actual": 17550.87, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6891-4166-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 51433, "actual": 45003.83, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6891-4173-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 66040, "actual": 63287.9, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6894-4166-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 8572, "actual": 7857.85, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6894-4176-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 102232, "actual": 92256.94, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6895-4385-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 69536, "actual": 66204.52, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6898-3180-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 24765, "actual": 23732.93, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6898-4166-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 4286, "actual": 2857.36, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6900-5290-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 10003, "actual": 9369.38, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6920-4166-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 34289, "actual": 31431.18, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6960-2210-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 30369, "actual": 28438.03, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6960-4166-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 8572, "actual": 7857.85, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6961-2110-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 16510, "actual": 15821.93, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-6970-2120-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 10123, "actual": 9479.38, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-7101-3117-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 138443, "actual": 131067.98, "enc": 0}, {"fund": "11", "obj": "1210", "code": "11-1210-7105-4167-000", "desc": "Administrator", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 20006, "actual": 18738.65, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6010-1000-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 5280, "actual": 4840, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6011-1100-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 4800, "actual": 4400, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6012-1200-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 4800, "actual": 4400, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6820-4166-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 480, "actual": 120, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6823-4166-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 480, "actual": 120, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6825-4166-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 120, "actual": 30, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6840-4166-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 240, "actual": 3260, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6840-4176-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 18060, "actual": 16555, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6891-4166-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 1440, "actual": 360, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6894-4166-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 240, "actual": 60, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6894-4176-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 4800, "actual": 4400, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6898-4166-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 120, "actual": 30, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6920-4166-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 960, "actual": 240, "enc": 0}, {"fund": "11", "obj": "1211", "code": "11-1211-6960-4166-000", "desc": "Admin In-Dist Allowance", "acctType": "Expense", "cat": "Wages - Academic/Certificated", "plan": "Fixed Monthly", "budget": 240, "actual": 60, "enc": 0}, {"fund": "11", "obj": "4310", "code": "11-4310-6771-1242-000", "desc": "Instructional Supplies", "acctType": "Expense", "cat": "Supplies & Materials", "plan": "User Planned", "budget": 12000, "actual": 4820, "enc": 650}, {"fund": "11", "obj": "4350", "code": "11-4350-6771-1242-000", "desc": "Software & Subscriptions", "acctType": "Expense", "cat": "Supplies & Materials", "plan": "User Planned", "budget": 8000, "actual": 5200, "enc": 0}, {"fund": "11", "obj": "4500", "code": "11-4500-6771-1242-000", "desc": "Other Supplies", "acctType": "Expense", "cat": "Supplies & Materials", "plan": "User Planned", "budget": 2000, "actual": 430, "enc": 0}, {"fund": "11", "obj": "5210", "code": "11-5210-6771-1242-000", "desc": "Travel & Conference", "acctType": "Expense", "cat": "Services & Operating", "plan": "User Planned", "budget": 6000, "actual": 1750, "enc": 0}, {"fund": "11", "obj": "5610", "code": "11-5610-6771-1242-000", "desc": "Equipment Rental / Lease", "acctType": "Expense", "cat": "Services & Operating", "plan": "User Planned", "budget": 3500, "actual": 1458, "enc": 292}, {"fund": "11", "obj": "5810", "code": "11-5810-6771-1242-000", "desc": "Professional / Contract Services", "acctType": "Expense", "cat": "Services & Operating", "plan": "User Planned", "budget": 25000, "actual": 9600, "enc": 7400}, {"fund": "11", "obj": "5840", "code": "11-5840-6771-1242-000", "desc": "Dues & Memberships", "acctType": "Expense", "cat": "Services & Operating", "plan": "User Planned", "budget": 1500, "actual": 1500, "enc": 0}, {"fund": "11", "obj": "5910", "code": "11-5910-6771-1242-000", "desc": "Postage & Freight", "acctType": "Expense", "cat": "Services & Operating", "plan": "User Planned", "budget": 800, "actual": 210, "enc": 0}, {"fund": "11", "obj": "6410", "code": "11-6410-6771-1242-000", "desc": "Equipment > $5,000", "acctType": "Expense", "cat": "Capital Outlay / Equipment", "plan": "User Planned", "budget": 15000, "actual": 0, "enc": 12500}, {"fund": "11", "obj": "8860", "code": "11-8860-6771-1242-000", "desc": "Local Revenue / Program Fees", "acctType": "Revenue", "cat": "Revenues", "plan": "User Planned", "budget": 40000, "actual": 18500, "enc": 0}, {"fund": "11", "obj": "8890", "code": "11-8890-6771-1242-000", "desc": "Other Local Revenue", "acctType": "Revenue", "cat": "Revenues", "plan": "User Planned", "budget": 5000, "actual": 1200, "enc": 0}];
+const MONTHS = ["Jul","Aug","Sep","Oct","Nov","Dec","Jan","Feb","Mar","Apr","May","Jun"];
+const KEY = "ltcc_budget_v1";
+const usd = n => (n<0?"-":"")+"$"+Math.abs(Math.round(n)).toLocaleString("en-US");
+const pct = n => (n*100).toFixed(1)+"%";
+const ICONS={
+ wallet:'<path d="M3 7h15a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11v3"/><circle cx="16.5" cy="13" r="1.2"/>',
+ calendar:'<rect x="3" y="4" width="18" height="17" rx="2"/><path d="M3 9h18M8 2v4M16 2v4"/>',
+ card:'<rect x="3" y="5" width="18" height="14" rx="2"/><path d="M3 10h18"/>',
+ coins:'<ellipse cx="9" cy="7" rx="6" ry="3"/><path d="M3 7v5c0 1.7 2.7 3 6 3s6-1.3 6-3"/><path d="M15 12c3.3 0 6-1.3 6-3s-2.7-3-6-3"/>',
+ trending:'<path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/>',
+ alert:'<path d="M12 3l9 16H3z"/><path d="M12 10v4M12 17.4v.2"/>',
+ lock:'<rect x="4" y="10" width="16" height="10" rx="2"/><path d="M8 10V7a4 4 0 0 1 8 0v3"/>',
+ clock:'<circle cx="12" cy="12" r="9"/><path d="M12 7v5l3 2"/>',
+ cart:'<path d="M3 5h2l2 12h11l2-8H7"/><circle cx="9" cy="20" r="1.3"/><circle cx="18" cy="20" r="1.3"/>',
+ users:'<circle cx="9" cy="8" r="3.2"/><path d="M3 20c0-3.3 2.7-6 6-6s6 2.7 6 6"/><path d="M16 5.5a3 3 0 0 1 0 5.8M21 20c0-2.5-1.4-4.7-3.5-5.6"/>',
+ box:'<path d="M12 3l8 4-8 4-8-4z"/><path d="M4 7v9l8 4 8-4V7"/><path d="M12 11v9"/>',
+ file:'<path d="M6 3h8l4 4v14H6z"/><path d="M14 3v4h4"/><path d="M9 13h6M9 16h6"/>',
+ tool:'<path d="M14 6a3.5 3.5 0 0 0 4.6 4.6L21 13l-8 8-2.4-2.4A3.5 3.5 0 0 0 6 14L3 11l8-8z"/>',
+ zap:'<path d="M13 2L4 14h7l-1 8 9-12h-7z"/>',
+ printer:'<path d="M7 8V3h10v5"/><rect x="4" y="8" width="16" height="8" rx="2"/><path d="M7 13h10v8H7z"/><path d="M17 11h.01"/>',
+ dot:'<circle cx="12" cy="12" r="4"/>'
+};
+const icon = n => `<svg viewBox="0 0 24 24">${ICONS[n]||ICONS.dot}</svg>`;
+function iconForLabel(l){ l=(l||"").toLowerCase();
+ if(l.includes("review")||l.includes(" over")) return "alert";
+ if(l.includes("spent")||l.includes("actual")) return "card";
+ if(l.includes("remaining")) return "coins";
+ if(l.includes("revenue")) return "trending";
+ if(l.includes("encumber")) return "lock";
+ if(l.includes("year")||l.includes("today")) return "clock";
+ if(l.includes("purchase")) return "cart";
+ if(l.includes("plan")) return "calendar";
+ return "wallet";
+}
+function catMeta(cat){ const c=(cat||"").toLowerCase();
+ if(c.includes("wage")||c.includes("benefit")||c.includes("payroll")||c.includes("salar")) return {label:"People & Payroll",icon:"users",color:"var(--pine)",tint:"var(--pine-bg)"};
+ if(c.includes("suppl")||c.includes("material")) return {label:"Supplies",icon:"box",color:"var(--tahoe)",tint:"var(--tahoe-bg)"};
+ if(c.includes("capital")||c.includes("equip")) return {label:"Equipment",icon:"tool",color:"var(--steel)",tint:"var(--steel-bg)"};
+ if(c.includes("utilit")) return {label:"Utilities",icon:"zap",color:"var(--amber)",tint:"var(--amber-bg)"};
+ if(c.includes("revenue")||c.includes("income")) return {label:"Revenue",icon:"trending",color:"var(--gold-d)",tint:"var(--gold-bg)"};
+ if(c.includes("service")||c.includes("operating")||c.includes("contract")||c.includes("outgo")||c.includes("transfer")) return {label:"Services & Contracts",icon:"file",color:"#2F7A70",tint:"#E4F1EE"};
+ return {label:cat||"Other",icon:"dot",color:"var(--slate)",tint:"var(--line2)"};
+}
+function catChip(cat){ const m=catMeta(cat); return `<span class="cat" title="${escAttr(cat)}"><span class="cdot" style="background:${m.tint};color:${m.color}">${icon(m.icon)}</span>${m.label}</span>`; }
+function monthlyChartHTML(){
+  const sums=MONTHS.map((_,mi)=>state.accounts.filter(a=>!isRev(a)).reduce((s,a)=>s+(+months(a)[mi]||0),0));
+  const max=Math.max(...sums,1), avg=sums.reduce((a,b)=>a+b,0)/12;
+  const W=980,H=170,pt=18,pb=26,bw=W/12;
+  const y=v=>pt+(1-v/max)*(H-pt-pb);
+  const nowM=(new Date().getMonth()+6)%12; // fiscal month index (Jul=0)
+  const bars=sums.map((v,i)=>{
+    const bh=Math.max(2,(H-pt-pb)*(v/max)), x=i*bw+bw*0.16;
+    const compact=v>=1e6?"$"+(v/1e6).toFixed(2)+"M":v>=1e3?"$"+Math.round(v/1e3)+"K":"$"+Math.round(v);
+    return `<rect class="bar ${i>nowM?'future':''}" x="${x.toFixed(1)}" y="${y(v).toFixed(1)}" width="${(bw*0.68).toFixed(1)}" height="${bh.toFixed(1)}" rx="3"/>
+      <text class="vlab" x="${(i*bw+bw/2).toFixed(1)}" y="${(y(v)-5).toFixed(1)}">${compact}</text>
+      <text class="mlab" x="${(i*bw+bw/2).toFixed(1)}" y="${H-8}">${MONTHS[i]}</text>`;
+  }).join("");
+  return `<div class="chartcard"><div class="ch"><span class="t">Planned spending by month</span>
+    <span class="s">Average <b style="color:var(--gold-d)">${usd(avg)}/mo</b> (dashed line) · darker bars are months already passed</span></div>
+    <svg class="mchart" viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" role="img" aria-label="Planned expense by month">
+      <line class="avg" x1="0" x2="${W}" y1="${y(avg).toFixed(1)}" y2="${y(avg).toFixed(1)}"/>
+      ${bars}</svg></div>`;
+}
+function buildPrintSummary(){
+  const t=totals(), today=new Date().toLocaleDateString("en-US",{year:"numeric",month:"long",day:"numeric"});
+  const groups={};
+  state.accounts.forEach(a=>{const k=catMeta(a.cat).label;(groups[k]=groups[k]||[]).push(a);});
+  let body="";
+  Object.entries(groups).sort((x,y)=>y[1].reduce((s,a)=>s+a.budget,0)-x[1].reduce((s,a)=>s+a.budget,0)).forEach(([k,list])=>{
+    const gb=list.reduce((s,a)=>s+a.budget,0), gp=list.reduce((s,a)=>s+planned(a),0), ga=list.reduce((s,a)=>s+a.actual,0), ge=list.reduce((s,a)=>s+a.enc,0);
+    body+=`<tr class="cat"><td class="l">${k}</td><td class="l"></td><td>${usd(gb)}</td><td>${usd(gp)}</td><td>${usd(ga)}</td><td>${usd(ge)}</td><td>${usd(gb-ga-ge)}</td></tr>`;
+    list.forEach(a=>{
+      body+=`<tr><td class="l">${a.code}</td><td class="l">${a.desc}${a.notes?` <span class="pnote">— ${a.notes}</span>`:""}</td><td>${usd(a.budget)}</td><td>${usd(planned(a))}</td><td>${usd(a.actual)}</td><td>${usd(a.enc)}</td><td>${usd(a.budget-a.actual-a.enc)}</td></tr>`;
+    });
+  });
+  $("#printSummary").innerHTML=`
+    <h1>Budget Summary — ${state.dept}</h1>
+    <div class="psub">Lake Tahoe Community College · Fiscal Year ${state.fy} (July–June) · Prepared ${today}</div>
+    <div class="prule"></div>
+    <div class="kgrid">
+      <div class="k"><div class="kl">Total Budget</div><div class="kv">${usd(t.budget)}</div></div>
+      <div class="k"><div class="kl">Planned</div><div class="kv">${usd(t.planned)}</div></div>
+      <div class="k"><div class="kl">Spent to Date</div><div class="kv">${usd(t.actual)}</div></div>
+      <div class="k"><div class="kl">Encumbered</div><div class="kv">${usd(t.enc)}</div></div>
+      <div class="k"><div class="kl">Remaining</div><div class="kv">${usd(t.budget-t.actual-t.enc)}</div></div>
+    </div>
+    <table><thead><tr><th class="l">Account</th><th class="l">Description</th><th>Budget</th><th>Planned</th><th>Actual</th><th>Encumb.</th><th>Remaining</th></tr></thead>
+    <tbody>${body}
+    <tr class="grand"><td class="l" colspan="2">Total</td><td>${usd(t.budget)}</td><td>${usd(t.planned)}</td><td>${usd(t.actual)}</td><td>${usd(t.enc)}</td><td>${usd(t.budget-t.actual-t.enc)}</td></tr></tbody></table>
+    <div class="pfoot"><span>Generated by the LTCC Budget Workbook</span><span>Notes shown in italics were entered by the budget owner.</span></div>`;
+}
+function printSummary(){ buildPrintSummary(); window.print(); }
+function animateKPIs(){
+  if(matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.querySelectorAll(".kpi .val").forEach(el=>{
+    const txt=el.textContent, m=txt.match(/^\$([\d,]+)$/); if(!m) return;
+    const target=+m[1].replace(/,/g,""); if(!target) return;
+    const t0=performance.now(), dur=520;
+    const step=n=>{const p=Math.min(1,(n-t0)/dur), e=1-Math.pow(1-p,3);
+      el.textContent="$"+Math.round(target*e).toLocaleString("en-US");
+      if(p<1) requestAnimationFrame(step);};
+    requestAnimationFrame(step);
+  });
+}
+function categoryCardHTML(){
+  const groups={}; let tot=0;
+  state.accounts.forEach(a=>{ const m=catMeta(a.cat), k=m.label; if(!groups[k]) groups[k]={m,budget:0,actual:0,n:0}; groups[k].budget+=a.budget; groups[k].actual+=a.actual; groups[k].n++; tot+=a.budget; });
+  const rows=Object.values(groups).sort((x,y)=>y.budget-x.budget).map(g=>{
+    const p=tot?g.budget/tot:0;
+    return `<div class="catrow">
+      <div class="catico" style="background:${g.m.tint};color:${g.m.color}">${icon(g.m.icon)}</div>
+      <div class="catmeta">
+        <div class="n"><span>${g.m.label} <span style="color:var(--slate2);font-weight:500">· ${g.n} lines</span></span><span class="amt">${usd(g.budget)}</span></div>
+        <div class="catbar"><i style="width:${(p*100).toFixed(1)}%;background:${g.m.color}"></i></div>
+        <div class="sub">${pct(p)} of total budget · ${usd(g.actual)} spent to date</div>
+      </div></div>`;
+  }).join("");
+  return `<div class="catcard"><div class="ch"><span class="t">Budget by category</span><span class="s">${usd(tot)} total</span></div>${rows}</div>`;
+}
+
+let state = {
+  view:"dashboard", dept:"Department", fy:"2025–26", query:"", pfilter:"all",
+  accounts: SEED.map(a => ({...a, months: Array(12).fill(0), notes:""})),
+  purchases: [
+    {status:"Planned", desc:"Microscope replacement", type:"PO", vendor:"BioSupplyCo", code:"11-6410-6771-1242-000", amount:9200, needby:"2026-02-15", lead:45, notes:""},
+    {status:"Planned", desc:"Annual software renewal", type:"Contract", vendor:"DataLabs Inc", code:"11-4350-6771-1242-000", amount:5200, needby:"2026-01-10", lead:30, notes:""},
+    {status:"Idea", desc:"Spring field-trip transport", type:"Requisition", vendor:"Tahoe Charter", code:"11-5210-6771-1242-000", amount:1800, needby:"2026-04-01", lead:21, notes:""}
+  ]
+};
+
+/* ---------- persistence ---------- */
+function save(){
+  const plan = {};
+  state.accounts.forEach(a => { plan[a.code] = {months:a.months, notes:a.notes}; });
+  localStorage.setItem(KEY, JSON.stringify({dept:state.dept, plan, purchases:state.purchases}));
+}
+let _saveT; function queueSave(){ clearTimeout(_saveT); _saveT=setTimeout(save,400); }
+function load(){
+  try{
+    const raw = localStorage.getItem(KEY); if(!raw) return;
+    const d = JSON.parse(raw);
+    if(d.dept) state.dept = d.dept;
+    if(d.purchases) state.purchases = d.purchases;
+    if(d.plan) state.accounts.forEach(a => { if(d.plan[a.code]){ a.months = d.plan[a.code].months||a.months; a.notes = d.plan[a.code].notes||""; }});
+  }catch(e){}
+}
+
+/* ---------- computations ---------- */
+const isFixed = a => a.plan === "Fixed Monthly";
+const isRev = a => a.acctType === "Revenue";
+function months(a){
+  if(!isFixed(a)) return a.months;
+  const per = Math.round(a.budget/12); const arr = Array(11).fill(per);
+  arr.push(a.budget - per*11); return arr;
+}
+const planned = a => months(a).reduce((s,x)=>s+(+x||0),0);
+function overShort(a){ const p = planned(a); return isRev(a) ? Math.max(0,a.budget-p) : Math.max(0,p-a.budget); }
+function status(a){
+  const os = overShort(a), p = planned(a);
+  if(os>0) return isRev(a) ? ["Revenue Short","amber"] : ["Over Plan","red"];
+  if(p===0) return ["Not Planned","gray"];
+  return ["On Plan","green"];
+}
+function actualsStatus(a){
+  if(a.budget===0) return ["—","gray"];
+  if(isRev(a)){ if(a.actual>=a.budget) return ["Goal Met","green"]; return a.actual/a.budget<0.5?["Behind","amber"]:["On Track","green"]; }
+  const used=a.actual+a.enc;
+  if(used>a.budget) return ["Over Budget","red"];
+  return used/a.budget>0.9 ? ["Watch","amber"] : ["On Track","green"];
+}
+function totals(){
+  const exp = state.accounts.filter(a=>!isRev(a)), rev = state.accounts.filter(isRev);
+  const sum = (arr,f)=>arr.reduce((s,a)=>s+f(a),0);
+  return {
+    expBudget:sum(exp,a=>a.budget), expPlanned:sum(exp,planned),
+    revBudget:sum(rev,a=>a.budget), revPlanned:sum(rev,planned),
+    budget:sum(state.accounts,a=>a.budget), planned:sum(state.accounts,planned),
+    actual:sum(state.accounts,a=>a.actual), enc:sum(state.accounts,a=>a.enc),
+    review: state.accounts.filter(a=>{const s=status(a)[0]; return s==="Over Plan"||s==="Revenue Short";}).length,
+    over: state.accounts.filter(a=>actualsStatus(a)[0]==="Over Budget").length
+  };
+}
+function yearElapsed(){
+  const s=new Date(2025,6,1), e=new Date(2026,5,30), now=new Date();
+  return Math.min(1, Math.max(0,(now-s)/(e-s)));
+}
+function purchaseWindow(p){
+  if(!p.needby) return ["—","gray"];
+  const orderBy = new Date(p.needby); orderBy.setDate(orderBy.getDate() - (+p.lead||0));
+  const days = Math.ceil((orderBy - new Date())/86400000);
+  if(days<0) return ["Overdue","red"];
+  if(days<=30) return ["Next 30 days","amber"];
+  if(days<=60) return ["31–60 days","gray"];
+  if(days<=90) return ["61–90 days","gray"];
+  return ["90+ days","gray"];
+}
+
+/* ---------- render ---------- */
+const $=(s,r=document)=>r.querySelector(s);
+function toast(m){ const t=$("#toast"); t.textContent=m; t.classList.add("show"); clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove("show"),1900); }
+
+function kpi(lab,val,cap,cls=""){ return `<div class="kpi ${cls}"><span class="accent"></span><span class="kic">${icon(iconForLabel(lab))}</span><div class="lab">${lab}</div><div class="val num">${val}</div>${cap?`<div class="cap">${cap}</div>`:""}</div>`; }
+
+function renderDashboard(){
+  const t=totals(), ye=yearElapsed();
+  const spentPct = t.budget? (t.actual+t.enc)/t.budget : 0;
+  const main=$("#main");
+  main.innerHTML=`
+    <div class="head"><div><h1 class="display">Dashboard</h1>
+    <p>Where ${state.dept} stands this year — budget, plan, and spending at a glance.</p></div>
+    <div class="actions"><button class="btn" id="printBtn">${icon("printer")} Print summary</button></div></div>
+    <div class="kpis">
+      ${kpi("Expense Budget", usd(t.expBudget))}
+      ${kpi("Planned", usd(t.expPlanned), (t.expBudget-t.expPlanned>=0?usd(t.expBudget-t.expPlanned)+" unplanned":usd(t.expPlanned-t.expBudget)+" over"))}
+      ${kpi("Spent to Date", usd(t.actual), pct(t.budget?t.actual/t.budget:0)+" of budget")}
+      ${kpi("Remaining", usd(t.budget-t.actual-t.enc), usd(t.enc)+" encumbered")}
+      ${kpi("Rows to Review", t.review, t.review?"need attention":"all clear", t.review?"warn":"good")}
+    </div>
+    <div class="meter-card">
+      <div class="meter-top"><span class="t">Fiscal year vs spending</span>
+        <span class="s">You've used <b>${pct(spentPct)}</b> of budget · <b>${pct(ye)}</b> of the year has passed</span></div>
+      <div class="meter">
+        <div class="spend" style="width:${Math.min(100,spentPct*100)}%"></div>
+        <div class="yearline" data-lab="Today · ${pct(ye)} of year" style="left:${ye*100}%"></div>
+      </div>
+      <div class="meter-legend">
+        <span><span class="dot" style="background:var(--teal)"></span>Spent + encumbered <b>${usd(t.actual+t.enc)}</b></span>
+        <span><span class="dot" style="background:var(--ink)"></span>Today's point in the year</span>
+        <span>${spentPct>ye+0.03?'<b style="color:var(--red)">Spending ahead of pace</b>':spentPct<ye-0.03?'<b style="color:var(--green)">Spending behind pace</b>':'<b>On pace</b>'}</span>
+      </div>
+    </div>
+    ${monthlyChartHTML()}
+    ${categoryCardHTML()}
+    <div class="kpis">
+      ${kpi("Revenue Budget", usd(t.revBudget))}
+      ${kpi("Revenue Planned", usd(t.revPlanned))}
+      ${kpi("Accounts Over Budget", t.over, t.over?"review actuals":"none", t.over?"warn":"good")}
+      ${kpi("Purchases Planned", usd(state.purchases.reduce((s,p)=>s+(+p.amount||0),0)), state.purchases.length+" items")}
+    </div>`;
+}
+
+const escAttr = s => (s||"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;");
+function chipCounts(){
+  const editable=state.accounts.filter(a=>!isFixed(a)).length;
+  const review=state.accounts.filter(a=>{const s=status(a)[0];return s==="Over Plan"||s==="Revenue Short";}).length;
+  return {all:state.accounts.length, editable, review};
+}
+function currentPlanRows(){
+  let list=state.accounts.map((a,i)=>({a,i}));
+  if(state.pfilter==="editable") list=list.filter(x=>!isFixed(x.a));
+  else if(state.pfilter==="review") list=list.filter(x=>{const s=status(x.a)[0];return s==="Over Plan"||s==="Revenue Short";});
+  const q=(state.query||"").trim().toLowerCase();
+  if(q) list=list.filter(x=>(x.a.code+" "+x.a.desc+" "+x.a.cat).toLowerCase().includes(q));
+  return list;
+}
+function planKpiHTML(){
+  const t=totals();
+  return `${kpi("Expense Budget", usd(t.expBudget))}${kpi("Expense Planned", usd(t.expPlanned))}${kpi("Remaining / Over", usd(t.expBudget-t.expPlanned),"",t.expPlanned>t.expBudget?"warn":"")}${kpi("Rows to Review", t.review,"",t.review?"warn":"good")}`;
+}
+function planRowHTML(a,i){
+  const m=months(a), fx=isFixed(a), [st,cl]=status(a), os=overShort(a);
+  const cells=m.map((v,mi)=> fx
+    ? `<td class="locked num">${usd(v)}</td>`
+    : `<td><input class="mo-input num" data-i="${i}" data-m="${mi}" value="${v||""}" inputmode="numeric" aria-label="${MONTHS[mi]} ${escAttr(a.desc)}"/></td>`).join("");
+  const hasNote=!!(a.notes&&a.notes.trim());
+  const tools=`<div class="rowtools">
+     <button class="tbtn notebtn ${hasNote?'has':''}" data-note="${i}" title="${hasNote?escAttr(a.notes):'Add a note'}">${hasNote?'Note ●':'+ Note'}</button>
+     ${fx?'':`<button class="tbtn" data-spread="${i}" title="Spread the annual budget evenly across 12 months">Spread</button><button class="tbtn" data-clear="${i}" title="Clear all months">Clear</button>`}
+   </div>`;
+  return `<tr>
+    <td class="l mono stick c-code">${a.code}</td>
+    <td class="l stick c-desc" title="${escAttr(a.desc)}">${a.desc}</td>
+    <td class="l">${catChip(a.cat)}</td>
+    ${cells}
+    <td class="total num" id="pt${i}">${usd(planned(a))}</td>
+    <td class="num">${usd(a.budget)}</td>
+    <td class="num" id="os${i}" style="${os>0?'color:var(--red);font-weight:600':''}">${usd(os)}</td>
+    <td id="stt${i}"><span class="pill ${cl}">${st}</span></td>
+    <td class="l">${tools}</td>
+  </tr>`;
+}
+function renderPlanning(){
+  const c=chipCounts();
+  $("#main").innerHTML=`
+    <div class="head"><div><h1 class="display">Budget Planning</h1>
+    <p>Spread each budget line across the year. Type in the <b>yellow</b> cells; fixed rows fill in automatically. Add a note to any line for context.</p></div>
+    <div class="actions"><button class="btn" id="expCsv">Export CSV</button><button class="btn" id="printBtn">${icon("printer")} Print summary</button></div></div>
+    <div class="kpis" id="planKpis">${planKpiHTML()}</div>
+    <div class="plan-toolbar">
+      <label class="search"><input id="planSearch" type="text" placeholder="Search account or description" value="${escAttr(state.query)}" spellcheck="false" aria-label="Search budget lines"/></label>
+      <div class="chips">
+        <button class="chip ${state.pfilter==='all'?'on':''}" data-chip="all">All<span class="n">${c.all}</span></button>
+        <button class="chip ${state.pfilter==='editable'?'on':''}" data-chip="editable">To plan<span class="n">${c.editable}</span></button>
+        <button class="chip ${state.pfilter==='review'?'on':''}" data-chip="review">Needs review<span class="n">${c.review}</span></button>
+      </div>
+      <span class="shown" id="planShown"></span>
+    </div>
+    <div class="panel">
+      <div class="panel-h"><span class="t">Budget lines</span>
+        <span class="legend"><span><span class="dot" style="background:var(--edit);border:1px solid var(--edit-b)"></span>Editable</span>
+        <span><span class="dot" style="background:#F6F8FB;border:1px solid var(--line)"></span>Locked</span></span></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th class="l stick c-code">Account</th><th class="l stick c-desc">Description</th><th class="l">Category</th>
+        ${MONTHS.map(m=>`<th>${m}</th>`).join("")}<th>Planned</th><th>Budget</th><th>Over/Short</th><th class="l">Status</th><th class="l">Notes</th></tr></thead>
+        <tbody id="planBody"></tbody>
+        <tfoot><tr><td class="l" colspan="3">Total shown</td>
+        ${MONTHS.map((_,mi)=>`<td class="num" id="ft${mi}"></td>`).join("")}
+        <td class="num" id="ftp"></td><td class="num" id="ftb"></td><td></td><td></td><td></td></tr></tfoot>
+      </table></div>
+    </div>`;
+  fillPlanRows();
+}
+function updatePlanFooter(list){
+  MONTHS.forEach((_,mi)=>{ const el=$("#ft"+mi); if(el) el.textContent=usd(list.reduce((s,x)=>s+(+months(x.a)[mi]||0),0)); });
+  const fp=$("#ftp"); if(fp) fp.textContent=usd(list.reduce((s,x)=>s+planned(x.a),0));
+  const fb=$("#ftb"); if(fb) fb.textContent=usd(list.reduce((s,x)=>s+x.a.budget,0));
+}
+function fillPlanRows(){
+  const list=currentPlanRows(), body=$("#planBody"); if(!body) return;
+  body.innerHTML = list.length ? list.map(({a,i})=>planRowHTML(a,i)).join("")
+    : `<tr><td colspan="20" class="l" style="padding:24px;color:var(--slate)">No lines match. Try a different search or filter.</td></tr>`;
+  const sh=$("#planShown"); if(sh) sh.textContent=`Showing ${list.length} of ${state.accounts.length}`;
+  updatePlanFooter(list);
+}
+function recalcRow(i){
+  const a=state.accounts[i];
+  const pt=$("#pt"+i); if(pt) pt.textContent=usd(planned(a));
+  const os=overShort(a), oc=$("#os"+i); if(oc){ oc.textContent=usd(os); oc.style.cssText=os>0?'color:var(--red);font-weight:600':''; }
+  const [st,cl]=status(a); const se=$("#stt"+i); if(se) se.innerHTML=`<span class="pill ${cl}">${st}</span>`;
+  updatePlanFooter(currentPlanRows());
+  const pk=$("#planKpis"); if(pk) pk.innerHTML=planKpiHTML();
+}
+function spreadRow(i){ const a=state.accounts[i]; const per=Math.round(a.budget/12); a.months=Array(11).fill(per); a.months.push(a.budget-per*11); save(); fillPlanRows(); }
+function clearRow(i){ state.accounts[i].months=Array(12).fill(0); save(); fillPlanRows(); }
+function openNote(i){ const a=state.accounts[i]; const m=$("#noteModal"); m.dataset.idx=i; $("#noteSub").textContent=a.code+" · "+a.desc; $("#noteText").value=a.notes||""; m.classList.add("show"); setTimeout(()=>$("#noteText").focus(),40); }
+function closeNote(){ $("#noteModal").classList.remove("show"); }
+function saveNote(){ const i=+$("#noteModal").dataset.idx; state.accounts[i].notes=$("#noteText").value.trim(); if(cloud.on) cloudNotes(state.accounts[i]); else save(); closeNote(); if(state.view==="planning") fillPlanRows(); toast("Note saved"); }
+function deleteNote(){ const i=+$("#noteModal").dataset.idx; state.accounts[i].notes=""; if(cloud.on) cloudNotes(state.accounts[i]); else save(); closeNote(); if(state.view==="planning") fillPlanRows(); toast("Note removed"); }
+
+function renderActuals(){
+  const t=totals();
+  let rows="";
+  state.accounts.forEach(a=>{
+    const used=a.actual+a.enc, rem=isRev(a)?a.budget-a.actual:a.budget-used;
+    const up=a.budget?used/a.budget:0, [st,cl]=actualsStatus(a);
+    rows+=`<tr>
+      <td class="l mono">${a.code}</td><td class="l">${a.desc}</td>
+      <td class="num">${usd(a.budget)}</td><td class="num">${usd(planned(a))}</td>
+      <td class="num">${usd(a.actual)}</td><td class="num">${usd(a.enc)}</td>
+      <td class="num">${usd(rem)}</td>
+      <td><span class="usebar ${up>1?'over':''}"><i style="width:${Math.min(100,up*100)}%"></i></span><span class="num">${a.budget?pct(up):"—"}</span></td>
+      <td><span class="pill ${cl}">${st}</span></td>
+    </tr>`;
+  });
+  $("#main").innerHTML=`
+    <div class="head"><div><h1 class="display">Plan vs Actuals</h1>
+    <p>What you planned against what's actually been spent. Import a monthly report to refresh the actuals.</p></div>
+    <div class="actions"><button class="btn" data-go="import">Import actuals</button></div></div>
+    <div class="kpis">
+      ${kpi("Total Budget", usd(t.budget))}
+      ${kpi("Spent to Date", usd(t.actual))}
+      ${kpi("Encumbered", usd(t.enc))}
+      ${kpi("Remaining", usd(t.budget-t.actual-t.enc))}
+      ${kpi("% of Year", pct(yearElapsed()), "elapsed")}
+      ${kpi("Over Budget", t.over, "", t.over?"warn":"good")}
+    </div>
+    <div class="panel"><div class="panel-h"><span class="t">Spending by account</span></div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th class="l">Account</th><th class="l">Description</th><th>Budget</th><th>Planned</th><th>Actual</th><th>Encumbered</th><th>Remaining</th><th class="l">% Used</th><th class="l">Status</th></tr></thead>
+        <tbody>${rows}</tbody>
+        <tfoot><tr><td class="l" colspan="2">Total</td><td class="num">${usd(t.budget)}</td><td class="num">${usd(t.planned)}</td><td class="num">${usd(t.actual)}</td><td class="num">${usd(t.enc)}</td><td class="num">${usd(t.budget-t.actual-t.enc)}</td><td></td><td></td></tr></tfoot>
+      </table></div></div>`;
+}
+
+function renderPurchases(){
+  const planned = state.purchases.reduce((s,p)=>s+(+p.amount||0),0);
+  const overdue = state.purchases.filter(p=>purchaseWindow(p)[0]==="Overdue").length;
+  const soon = state.purchases.filter(p=>purchaseWindow(p)[0]==="Next 30 days").length;
+  let rows="";
+  state.purchases.forEach((p,i)=>{
+    const [w,cl]=purchaseWindow(p);
+    const orderBy = p.needby ? (()=>{const d=new Date(p.needby); d.setDate(d.getDate()-(+p.lead||0)); return d.toISOString().slice(0,10);})() : "—";
+    rows+=`<tr>
+      <td class="l"><span class="pill gray">${p.status||"—"}</span></td>
+      <td class="l">${p.desc||""}</td><td class="l mono">${p.type||""}</td><td class="l">${p.vendor||""}</td>
+      <td class="l mono">${p.code||""}</td><td class="num">${usd(+p.amount||0)}</td>
+      <td class="num">${p.needby||"—"}</td><td class="num">${p.lead||0}d</td><td class="num">${orderBy}</td>
+      <td><span class="pill ${cl}">${w}</span></td>
+      <td><button class="btn ghost" data-del="${i}" style="padding:3px 8px;color:var(--red)">Remove</button></td>
+    </tr>`;
+  });
+  $("#main").innerHTML=`
+    <div class="head"><div><h1 class="display">Purchase Planner</h1>
+    <p>Plan upcoming purchases and contracts. The order window updates from each item's need-by date and lead time.</p></div></div>
+    <div class="kpis">
+      ${kpi("Planned Spend", usd(planned))}
+      ${kpi("Items Overdue", overdue, "", overdue?"warn":"good")}
+      ${kpi("Next 30 Days", soon)}
+      ${kpi("Today", new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"}))}
+    </div>
+    <div class="panel">
+      <div class="pform">
+        <div><label>Status</label><select id="f_status"><option>Idea</option><option selected>Planned</option><option>Submitted</option><option>Approved</option><option>Ordered</option></select></div>
+        <div style="grid-column:span 2"><label>Description</label><input id="f_desc" placeholder="What are you buying?"/></div>
+        <div><label>Type</label><select id="f_type"><option>PO</option><option>Contract</option><option>Requisition</option><option>Transfer</option><option>Event</option></select></div>
+        <div><label>Vendor</label><input id="f_vendor" placeholder="Vendor"/></div>
+        <div><label>Account code</label><input id="f_code" placeholder="11-…"/></div>
+        <div><label>Est. amount</label><input id="f_amount" inputmode="numeric" placeholder="0"/></div>
+        <div><label>Need-by date</label><input id="f_needby" type="date"/></div>
+        <div><label>Lead (days)</label><input id="f_lead" inputmode="numeric" placeholder="30"/></div>
+        <div class="add"><button class="btn primary" id="addP" style="width:100%">Add item</button></div>
+      </div>
+      <div class="tbl-wrap"><table>
+        <thead><tr><th class="l">Status</th><th class="l">Description</th><th class="l">Type</th><th class="l">Vendor</th><th class="l">Account</th><th>Amount</th><th>Need by</th><th>Lead</th><th>Order by</th><th class="l">Window</th><th></th></tr></thead>
+        <tbody>${rows||`<tr><td colspan="11" class="l" style="padding:26px;color:var(--slate)">No items yet — add your first planned purchase above.</td></tr>`}</tbody>
+      </table></div>
+    </div>`;
+}
+
+function renderImport(){
+  $("#main").innerHTML=`
+    <div class="head"><div><h1 class="display">Import Report</h1>
+    <p>Paste a FAR110 budget export or a CSV of accounts. We'll read the lines and update your budget rows.</p></div></div>
+    <div class="import-grid">
+      <div><textarea class="paste" id="pasteBox" placeholder="Paste your FAR110 report or CSV here…&#10;&#10;Expected columns (CSV): Fund,Object,Account Code,Description,Account Type,Category,Planning Type,Annual Budget,Actual,Encumbered"></textarea>
+        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap">
+          <button class="btn primary" id="parseBtn">Import pasted data</button>
+          <button class="btn" id="sampleBtn">Load sample data</button>
+          <button class="btn" id="jsonBtn">Download backup (JSON)</button>
+          <label class="btn" style="cursor:pointer">Restore backup<input type="file" id="jsonIn" accept="application/json" hidden/></label>
+        </div>
+      </div>
+      <div class="help">
+        <h3>How importing works</h3>
+        <ol>
+          <li>Your monthly plan entries are kept and matched back by account code, so importing won't wipe your work.</li>
+          <li>Fixed rows (wages, benefits, utilities) stay locked and spread evenly.</li>
+          <li>Operating and revenue rows stay editable.</li>
+        </ol>
+        <p style="margin:10px 0 0">Paste a full <b>FAR110</b> report (fixed-width text) or a CSV — the tool detects which and reads it. FAR110 exports are parsed by object code, pulling annual budget, expended, and encumbered for each account, and mapping wages/benefits/utilities to fixed rows and 4000–8000s to editable rows.</p>
+      </div>
+    </div>`;
+}
+
+/* ---------- FAR110 fixed-width parser ---------- */
+function mapObject(obj){const n=+obj;
+ if(n>=1000&&n<=1999)return["Wages - Academic/Certificated","Fixed Monthly","Expense"];
+ if(n>=2000&&n<=2999)return["Wages - Classified/Other","Fixed Monthly","Expense"];
+ if(n>=3000&&n<=3999)return["Benefits","Fixed Monthly","Expense"];
+ if(n>=5511&&n<=5519)return["Utilities","Fixed Monthly","Expense"];
+ if(n>=4000&&n<=4999)return["Supplies & Materials","User Planned","Expense"];
+ if(n>=5000&&n<=5999)return["Services & Operating","User Planned","Expense"];
+ if(n>=6000&&n<=6999)return["Capital Outlay / Equipment","User Planned","Expense"];
+ if(n>=7000&&n<=7999)return["Other Outgo / Transfers","User Planned","Expense"];
+ if(n>=8000&&n<=8999)return["Revenues","User Planned","Revenue"];
+ return["Other","User Planned","Expense"];}
+function parseFAR110(text){
+ const lines=text.split(/\r?\n/), out=[];
+ let curObj="",curObjDesc="",curCode=null;
+ const numRe=/-?[\d,]+\.\d{2}-?/g;
+ const num=s=>{s=s.trim();const neg=s.endsWith("-");s=s.replace(/-$/,"").replace(/,/g,"");const v=parseFloat(s)||0;return neg?-v:v;};
+ const objHdr=/^ {2}(\d{4}) {2,}(.+?)\s*$/;
+ const codeRe=/^\s*(\d{2}-\d{4}-\d{4}-\d{4}-\d{3})\b/;
+ for(const line of lines){let m;
+  if(m=line.match(objHdr)){curObj=m[1];curObjDesc=m[2].trim();curCode=null;continue;}
+  if(!curCode){const cm=line.match(codeRe);if(cm)curCode=cm[1];}
+  if(line.includes("ENDING BALANCE")){
+    const nums=line.match(numRe)||[], last4=nums.slice(-4);
+    if(last4.length>=4&&curCode){
+      const budget=num(last4[0]),exp=num(last4[1]),enc=num(last4[2]);
+      const p=curCode.split("-"),[cat,plan,atype]=mapObject(p[1]);
+      out.push({fund:p[0],obj:p[1],code:curCode,desc:curObjDesc||("Object "+curObj),
+        acctType:atype,cat,plan,budget:Math.round(budget),
+        actual:Math.round(exp*100)/100,enc:Math.round(enc*100)/100});
+    }
+    curCode=null;
+  }
+ }
+ return out;
+}
+/* ---------- CSV parse/export ---------- */
+function parseCSV(text){
+  const lines=text.trim().split(/\r?\n/).filter(l=>l.trim());
+  if(!lines.length) return [];
+  const head=lines[0].split(",").map(h=>h.trim().toLowerCase());
+  const idx=n=>head.findIndex(h=>h.includes(n));
+  const ic={code:idx("account code")>=0?idx("account code"):idx("code"), desc:idx("desc"), type:idx("account type"),
+    cat:idx("categ"), plan:idx("planning"), bud:idx("budget"), act:idx("actual"), enc:idx("encumber"),
+    fund:idx("fund"), obj:idx("object")};
+  const out=[];
+  for(let i=1;i<lines.length;i++){
+    const c=lines[i].split(",");
+    const code=(c[ic.code]||"").trim(); if(!code) continue;
+    out.push({fund:c[ic.fund]||"", obj:c[ic.obj]||"", code,
+      desc:(c[ic.desc]||"").trim(), acctType:(c[ic.type]||"Expense").trim()||"Expense",
+      cat:(c[ic.cat]||"Operating").trim(), plan:(c[ic.plan]||"User Planned").trim(),
+      budget:+(c[ic.bud]||0)||0, actual:+(c[ic.act]||0)||0, enc:+(c[ic.enc]||0)||0});
+  }
+  return out;
+}
+function exportCSV(){
+  const h=["Account Code","Description","Category","Planning Type",...MONTHS,"Planned Total","Annual Budget","Over/Short","Status"];
+  const rows=state.accounts.map(a=>{const m=months(a);return [a.code,a.desc,a.cat,a.plan,...m,planned(a),a.budget,overShort(a),status(a)[0]]
+    .map(v=>typeof v==="string"&&v.includes(",")?`"${v}"`:v).join(",");});
+  download("ltcc-budget-plan.csv",[h.join(","),...rows].join("\n"),"text/csv");
+}
+function download(name,content,type){
+  const b=new Blob([content],{type}); const u=URL.createObjectURL(b);
+  const a=document.createElement("a"); a.href=u; a.download=name; a.click(); URL.revokeObjectURL(u);
+}
+
+/* ---------- render router ---------- */
+function render(){
+  document.querySelectorAll("#nav a").forEach(a=>a.classList.toggle("on",a.dataset.view===state.view));
+  ({dashboard:renderDashboard, planning:renderPlanning, actuals:renderActuals, purchases:renderPurchases, import:renderImport}[state.view])();
+  animateKPIs();
+}
+function go(v){ state.view=v; render(); window.scrollTo(0,0); }
+
+/* ---------- events ---------- */
+document.addEventListener("click",async e=>{
+  const nav=e.target.closest("#nav a"); if(nav){ go(nav.dataset.view); return; }
+  const goBtn=e.target.closest("[data-go]"); if(goBtn){ go(goBtn.dataset.go); return; }
+  if(e.target.id==="expCsv"){ exportCSV(); toast("Plan exported to CSV"); }
+  if(e.target.closest && e.target.closest("#printBtn")){ printSummary(); return; }
+  if(e.target.id==="sampleBtn"){ localStorage.removeItem(KEY); location.reload(); }
+  if(e.target.id==="jsonBtn"){ save(); download("ltcc-budget-backup.json",localStorage.getItem(KEY)||"{}","application/json"); toast("Backup downloaded"); }
+  if(e.target.id==="parseBtn"){
+    const txt=$("#pasteBox").value;
+    const far=/FINANCIAL ACTIVITY REPORT|ENDING BALANCE|FD OBJT PROG/.test(txt);
+    const rows=far?parseFAR110(txt):parseCSV(txt);
+    if(!rows.length){ toast(far?"Couldn't read any accounts from that report":"No account rows found — check the format"); return; }
+    if(cloud.on){ const ok=await cloudImport(rows); if(ok){ toast(`Imported ${rows.length} accounts${far?" from FAR110":""}`); go("planning"); } return; }
+    const keep={}; state.accounts.forEach(a=>keep[a.code]={months:a.months,notes:a.notes});
+    state.accounts=rows.map(r=>({...r, months:keep[r.code]?keep[r.code].months:Array(12).fill(0), notes:keep[r.code]?keep[r.code].notes:""}));
+    save(); toast(`Imported ${rows.length} accounts${far?" from FAR110":""}`); go("planning");
+  }
+  if(e.target.id==="addP"){
+    const g=id=>$("#"+id).value;
+    if(!$("#f_desc").value){ toast("Add a description"); return; }
+    const np={status:g("f_status"),desc:g("f_desc"),type:g("f_type"),vendor:g("f_vendor"),code:g("f_code"),amount:+g("f_amount")||0,needby:g("f_needby"),lead:+g("f_lead")||0,notes:""};
+    state.purchases.push(np);
+    if(cloud.on) cloudAddPurchase(np); else save();
+    renderPurchases(); toast("Purchase added");
+  }
+  const chip=e.target.closest("[data-chip]"); if(chip){ state.pfilter=chip.dataset.chip; renderPlanning(); return; }
+  const sp=e.target.closest("[data-spread]"); if(sp){ spreadRow(+sp.dataset.spread); return; }
+  const cr=e.target.closest("[data-clear]"); if(cr){ clearRow(+cr.dataset.clear); return; }
+  const nb=e.target.closest("[data-note]"); if(nb){ openNote(+nb.dataset.note); return; }
+  if(e.target.id==="noteSave"){ saveNote(); return; }
+  if(e.target.id==="noteDelete"){ deleteNote(); return; }
+  if(e.target.id==="noteCancel" || e.target.id==="noteModal"){ closeNote(); return; }
+  const del=e.target.closest("[data-del]"); if(del){ const rem=state.purchases.splice(+del.dataset.del,1)[0]; if(cloud.on) cloudDelPurchase(rem); else save(); renderPurchases(); }
+});
+document.addEventListener("input",e=>{
+  if(e.target.classList.contains("mo-input")){
+    const i=+e.target.dataset.i, m=+e.target.dataset.m;
+    state.accounts[i].months[m]=+e.target.value.replace(/[^0-9.-]/g,"")||0;
+    recalcRow(i); if(cloud.on){ cloudPlan(state.accounts[i], m, state.accounts[i].months[m]); } else queueSave();
+  }
+  if(e.target.id==="planSearch"){ state.query=e.target.value; fillPlanRows(); }
+});
+document.addEventListener("focusin",e=>{ if(e.target.classList&&e.target.classList.contains("mo-input")) e.target.select(); });
+document.addEventListener("keydown",e=>{
+  if(e.key==="Escape"){ closeNote(); return; }
+  if(e.target.classList&&e.target.classList.contains("mo-input")&&["ArrowUp","ArrowDown","Enter"].includes(e.key)){
+    e.preventDefault();
+    const inputs=[...document.querySelectorAll(".mo-input")];
+    const idx=inputs.indexOf(e.target), m=+e.target.dataset.m, step=e.key==="ArrowUp"?-1:1;
+    for(let k=idx+step;k>=0&&k<inputs.length;k+=step){ if(+inputs[k].dataset.m===m){ inputs[k].focus(); break; } }
+  }
+});
+$("#deptIn").addEventListener("input",e=>{ state.dept=e.target.value||"Department"; save(); });
+$("#jsonIn")?.addEventListener("change",()=>{});
+document.addEventListener("change",e=>{
+  if(e.target.id==="jsonIn"){
+    const f=e.target.files[0]; if(!f) return; const r=new FileReader();
+    r.onload=()=>{ try{ localStorage.setItem(KEY,r.result); location.reload(); }catch(x){ toast("Couldn't read that file"); } }; r.readAsText(f);
+  }
+});
+
+/* ---------- cloud (Supabase) ---------- */
+const SB_URL="https://hikvktciywotfajkachb.supabase.co";
+const SB_KEY="sb_publishable_RnYIvufOXIVFaTuHmXNXZw_-7yjJY-B";
+const sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
+let cloud = { on:false, user:null, profile:null, deptId:null };
+
+function gateHTML(kind, extra){
+  if(kind==="login") return `<h2>Sign in</h2>
+    <p>Enter your college email and we'll send you a secure sign-in link. No password needed.</p>
+    <input id="gEmail" type="email" placeholder="you@ltcc.edu" autocomplete="email"/>
+    <button class="btn primary" id="gSend">Email me a sign-in link</button>
+    <div class="msg" id="gMsg">${extra||""}</div>`;
+  if(kind==="pending") return `<h2>Almost there</h2>
+    <p>Your account <b>${extra}</b> is created but hasn't been assigned to a department yet.<br/><br/>Ask your administrator to assign you, then reload this page.</p>
+    <button class="signout" id="gOut">Sign out</button>`;
+  return "";
+}
+function showGate(kind, extra){ $("#appRoot").style.display="none"; $("#gate").style.display="flex"; $("#gateBody").innerHTML=gateHTML(kind,extra); }
+function showApp(){ $("#gate").style.display="none"; $("#appRoot").style.display="grid"; }
+
+async function fetchAll(){
+  const { data: accts, error } = await sb.from("accounts").select("*, monthly_plans(month, amount)").order("code");
+  if(error){ toast("Couldn't load data: "+error.message); return; }
+  state.accounts = (accts||[]).map(r=>{
+    const months=Array(12).fill(0);
+    (r.monthly_plans||[]).forEach(p=>{ months[p.month]=+p.amount||0; });
+    return { id:r.id, fund:r.fund, obj:r.obj, code:r.code, desc:r.description,
+      acctType:r.acct_type, cat:r.category, plan:r.plan_type,
+      budget:+r.budget||0, actual:+r.actual||0, enc:+r.encumbered||0,
+      months, notes:r.notes||"" };
+  });
+  const { data: purs } = await sb.from("purchases").select("*").order("created_at");
+  state.purchases = (purs||[]).map(p=>({ id:p.id, status:p.status, desc:p.description, type:p.ptype,
+    vendor:p.vendor, code:p.account_code, amount:+p.amount||0, needby:p.need_by||"", lead:p.lead_days||0, notes:p.notes||"" }));
+}
+
+const _planQueue={}; 
+function cloudPlan(acct, month, amount){
+  if(!cloud.on||!acct.id) return;
+  const k=acct.id+":"+month; clearTimeout(_planQueue[k]);
+  _planQueue[k]=setTimeout(async()=>{
+    const { error } = await sb.from("monthly_plans").upsert({ account_id:acct.id, month, amount, updated_by:cloud.user.id });
+    if(error) toast("Save failed: "+error.message);
+  },500);
+}
+async function cloudNotes(acct){
+  if(!cloud.on||!acct.id) return;
+  const { error } = await sb.from("accounts").update({ notes:acct.notes }).eq("id",acct.id);
+  if(error) toast("Note save failed: "+error.message);
+}
+async function cloudAddPurchase(p){
+  if(!cloud.on) return;
+  const { data, error } = await sb.from("purchases").insert({ department_id:cloud.deptId, status:p.status,
+    description:p.desc, ptype:p.type, vendor:p.vendor, account_code:p.code, amount:p.amount,
+    need_by:p.needby||null, lead_days:p.lead, notes:p.notes, created_by:cloud.user.id }).select("id").single();
+  if(error){ toast("Save failed: "+error.message); return; }
+  p.id=data.id;
+}
+async function cloudDelPurchase(p){
+  if(!cloud.on||!p.id) return;
+  const { error } = await sb.from("purchases").delete().eq("id",p.id);
+  if(error) toast("Delete failed: "+error.message);
+}
+async function cloudImport(rows){
+  if(!cloud.on) return;
+  const payload=rows.map(r=>({ department_id:cloud.deptId, code:r.code, fund:r.fund||null, obj:r.obj||null,
+    description:r.desc, acct_type:r.acctType, category:r.cat, plan_type:r.plan,
+    budget:r.budget, actual:r.actual, encumbered:r.enc }));
+  const { error } = await sb.from("accounts").upsert(payload, { onConflict:"department_id,code" });
+  if(error){ toast("Import failed: "+error.message); return false; }
+  await fetchAll(); return true;
+}
+
+async function boot(){
+  if(!sb){ load(); $("#deptIn").value=state.dept; render(); return; }   // offline fallback
+  const { data:{ session } } = await sb.auth.getSession();
+  if(!session){ showGate("login"); return; }
+  cloud.user=session.user;
+  const { data: prof } = await sb.from("profiles").select("*, departments(id,name,fiscal_year)").eq("id",cloud.user.id).single();
+  if(!prof || !prof.department_id){ showGate("pending", cloud.user.email); return; }
+  cloud.on=true; cloud.profile=prof; cloud.deptId=prof.department_id;
+  state.dept=prof.departments?.name||"Department"; state.fy=prof.departments?.fiscal_year||state.fy;
+  if(prof.role==="viewer") document.body.classList.add("viewer");
+  await fetchAll();
+  showApp();
+  const di=$("#deptIn"); di.value=state.dept; di.readOnly=true;
+  const fyl=$("#fyLab"); if(fyl) fyl.textContent=state.fy;
+  render();
+}
+document.addEventListener("click", async e=>{
+  if(e.target.id==="gSend"){
+    const email=($("#gEmail").value||"").trim(); const msg=$("#gMsg");
+    if(!/.+@.+\..+/.test(email)){ msg.textContent="Enter a valid email address"; msg.classList.add("err"); return; }
+    msg.classList.remove("err"); msg.textContent="Sending…";
+    const { error } = await sb.auth.signInWithOtp({ email, options:{ emailRedirectTo: location.origin+location.pathname } });
+    msg.textContent = error ? "Error: "+error.message : "Check your inbox — the link signs you in.";
+    if(error) msg.classList.add("err");
+  }
+  if(e.target.id==="gOut"){ await sb.auth.signOut(); showGate("login"); }
+});
+if(sb) sb.auth.onAuthStateChange((ev)=>{ if(ev==="SIGNED_IN"||ev==="TOKEN_REFRESHED"){ if(!cloud.on) boot(); } });
+boot();
+</script>
+</body>
+</html>
