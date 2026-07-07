@@ -939,9 +939,11 @@ let cloud = { on:false, user:null, profile:null, deptId:null };
 
 function gateHTML(kind, extra){
   if(kind==="login") return `<h2>Sign in</h2>
-    <p>Enter your college email and we'll send you a secure sign-in link. No password needed.</p>
+    <p>Sign in with your email and password. New department? Enter your email and we'll send a link to get you set up.</p>
     <input id="gEmail" type="email" placeholder="you@ltcc.edu" autocomplete="email"/>
-    <button class="btn primary" id="gSend">Email me a sign-in link</button>
+    <input id="gPass" type="password" placeholder="Password" autocomplete="current-password"/>
+    <button class="btn primary" id="gLogin">Sign in</button>
+    <button class="btn" id="gSend" style="width:100%;margin-top:8px">Email me a sign-in link instead</button>
     <div class="msg" id="gMsg">${extra||""}</div>`;
   if(kind==="pending") return `<h2>Almost there</h2>
     <p>Your account <b>${extra}</b> is created but hasn't been assigned to a department yet.<br/><br/>Ask your administrator to assign you, then reload this page.</p>
@@ -1021,6 +1023,14 @@ async function boot(){
   render();
 }
 document.addEventListener("click", async e=>{
+  if(e.target.id==="gLogin"){
+    const email=($("#gEmail").value||"").trim(), pass=$("#gPass").value||""; const msg=$("#gMsg");
+    if(!email||!pass){ msg.textContent="Enter your email and password"; msg.classList.add("err"); return; }
+    msg.classList.remove("err"); msg.textContent="Signing in\u2026";
+    const { error } = await sb.auth.signInWithPassword({ email, password: pass });
+    if(error){ msg.textContent=error.message; msg.classList.add("err"); }
+    return;
+  }
   if(e.target.id==="gSend"){
     const email=($("#gEmail").value||"").trim(); const msg=$("#gMsg");
     if(!/.+@.+\..+/.test(email)){ msg.textContent="Enter a valid email address"; msg.classList.add("err"); return; }
