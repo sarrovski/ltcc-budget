@@ -398,6 +398,8 @@ tr.xrow>td{background:#F8FBF9; padding:16px 18px 18px; border-bottom:2px solid v
       <label for="deptIn">Department</label>
       <input id="deptIn" type="text" value="Department" spellcheck="false" />
       <select id="deptSwitch" class="sel" style="display:none;width:100%;background:#123B27;border-color:#1D4A34;color:#fff;font-weight:600;padding:7px 9px"></select>
+      <label style="display:block;font-size:9.5px;letter-spacing:.13em;text-transform:uppercase;color:#8DB09E;margin:10px 0 4px" id="budLabel" hidden>Budget</label>
+      <select id="budgetSwitch" class="sel" style="display:none;width:100%;background:#123B27;border-color:#1D4A34;color:#fff;font-weight:600;padding:7px 9px"></select>
       <div class="fy">Fiscal Year <b id="fyLab">2025–26</b> · Jul–Jun</div>
     </div>
     <nav id="nav">
@@ -979,7 +981,8 @@ function renderImport(){
     <div class="import-grid">
       <div><textarea class="paste" id="pasteBox" placeholder="Paste your FAR110 report or CSV here…&#10;&#10;Expected columns (CSV): Fund,Object,Account Code,Description,Account Type,Category,Planning Type,Annual Budget,Actual,Encumbered"></textarea>
         <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap">
-          <button class="btn primary" id="parseBtn">Import pasted data</button>
+          <button class="btn primary" id="parseNewBtn" ${cloud.on?"":"hidden"}>Import as new budget</button>
+          <button class="btn ${cloud.on?"":"primary"}" id="parseBtn" ${cloud.on&&!cloud.budgetId?"hidden":""}>${cloud.on?"Update current budget":"Import pasted data"}</button>
           <button class="btn" id="sampleBtn" ${cloud.on?'hidden':''}>Load sample data</button>
           <button class="btn" id="jsonBtn">Download backup (JSON)</button>
           <label class="btn" style="cursor:pointer" ${cloud.on?'hidden':''}>Restore backup<input type="file" id="jsonIn" accept="application/json" hidden/></label>
@@ -992,6 +995,10 @@ function renderImport(){
           <li>Fixed rows (wages, benefits, utilities) stay locked and spread evenly.</li>
           <li>Operating and revenue rows stay editable.</li>
         </ol>
+        ${cloud.on&&cloud.budgetId?`<div style="margin-top:14px;padding:12px 14px;border:1px solid var(--red-bg);background:#FEF7F7;border-radius:10px">
+          <div style="font-weight:700;font-size:12px;color:var(--red);margin-bottom:4px">Clear a budget</div>
+          <div style="font-size:11.5px;color:var(--slate);margin-bottom:9px">Deletes the currently loaded budget — its accounts, monthly plans and actuals. Other budgets are untouched.</div>
+          <button class="revoke" id="delBudget">Delete "${escAttr((cloud.budgets.find(b=>b.id===cloud.budgetId)||{}).name||"current budget")}"</button></div>`:""}
         <p style="margin:10px 0 0">Paste a full <b>FAR110</b> report (fixed-width text) or a CSV — the tool detects which and reads it. FAR110 exports are parsed by object code, pulling annual budget, expended, and encumbered for each account, and mapping wages/benefits/utilities to fixed rows and 4000–8000s to editable rows.</p>
       </div>
     </div>`;
@@ -1031,6 +1038,14 @@ function parseFAR110Tx(text){
  }
  for(const k in acc) acc[k]=acc[k].map(v=>Math.round(v*100)/100);
  return acc;
+}
+function parseFAR110Title(text){
+ for(const raw of text.split(/\r?\n/).slice(0,80)){
+   const l=raw.replace(/^\s*"/,"").replace(/"\s*$/,"");
+   const m=l.match(/^\s*(.+?)\s{2,}\d{2}\/\d{2}\/\d{4}\s+TO\s+\d{2}\/\d{2}\/\d{4}/i);
+   if(m && !/FINANCIAL ACTIVITY/i.test(m[1])) return m[1].trim();
+ }
+ return "Imported "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric",year:"numeric"});
 }
 function parseFAR110(text){
  const lines=text.split(/\r?\n/), out=[];
@@ -1103,6 +1118,24 @@ document.addEventListener("click",async e=>{
   if(e.target.closest && e.target.closest("#printBtn")){ printSummary(); return; }
   if(e.target.id==="sampleBtn"){ localStorage.removeItem(KEY); location.reload(); }
   if(e.target.id==="jsonBtn"){ save(); download("ltcc-budget-backup.json",localStorage.getItem(KEY)||"{}","application/json"); toast("Backup downloaded"); }
+  if(e.target.id==="delBudget"){
+    const b=cloud.budgets.find(x=>x.id===cloud.budgetId); if(!b) return;
+    if(!confirm(`Delete "${b.name}" and all its data? This cannot be undone.`)) return;
+    const { error } = await sb.from("budgets").delete().eq("id",b.id);
+    if(error){ toast("Delete failed: "+error.message); return; }
+    await loadBudgets(); if(cloud.budgetId && cloud.profile.role!=="viewer") setActiveBudget(cloud.budgetId);
+    await fetchAll(); render(); toast("Budget deleted"); return;
+  }
+  if(e.target.id==="parseNewBtn"){
+    const txt=$("#pasteBox").value;
+    const far=/FINANCIAL ACTIVITY REPORT|ENDING BALANCE|FD OBJT PROG/.test(txt);
+    const rows=far?parseFAR110(txt):parseCSV(txt);
+    if(!rows.length){ toast("Couldn't read any accounts — check the format"); return; }
+    const name=far?parseFAR110Title(txt):("Imported "+new Date().toLocaleDateString("en-US",{month:"short",day:"numeric"}));
+    const ok=await cloudImport(rows, far?parseFAR110Tx(txt):null, true, name);
+    if(ok){ toast(`New budget loaded: ${name}`); go("planning"); }
+    return;
+  }
   if(e.target.id==="parseBtn"){
     const txt=$("#pasteBox").value;
     const far=/FINANCIAL ACTIVITY REPORT|ENDING BALANCE|FD OBJT PROG/.test(txt);
@@ -1175,12 +1208,20 @@ document.addEventListener("keydown",e=>{
 $("#deptIn").addEventListener("input",e=>{ state.dept=e.target.value||"Department"; save(); });
 $("#jsonIn")?.addEventListener("change",()=>{});
 document.addEventListener("change",async e=>{
+  if(e.target.id==="budgetSwitch"){
+    cloud.budgetId=e.target.value;
+    if(cloud.profile.role!=="viewer") setActiveBudget(cloud.budgetId);
+    state.xopen=null; showGate("loading"); await fetchAll(); showApp(); render();
+    const bn=cloud.budgets.find(b=>b.id===cloud.budgetId);
+    if(bn){ state.fy=bn.fiscal_year||state.fy; const fyl=$("#fyLab"); if(fyl) fyl.textContent=state.fy; }
+    toast("Loaded: "+(bn?bn.name:"budget")); return;
+  }
   if(e.target.id==="deptSwitch"){
     cloud.deptId=e.target.value;
     const d=adm.depts.find(x=>x.id===cloud.deptId);
     state.dept=d?.name||"Department"; state.fy=d?.fiscal_year||state.fy;
     const fyl=$("#fyLab"); if(fyl) fyl.textContent=state.fy;
-    state.xopen=null; showGate("loading"); await fetchAll(); showApp(); render();
+    state.xopen=null; showGate("loading"); await loadBudgets(); await fetchAll(); showApp(); render();
     toast("Viewing "+state.dept); return;
   }
   if(e.target.dataset&&e.target.dataset.udept!==undefined){ admSetProfile(e.target.dataset.udept,{department_id:e.target.value||null},"Department updated"); return; }
@@ -1195,7 +1236,23 @@ document.addEventListener("change",async e=>{
 const SB_URL="https://hikvktciywotfajkachb.supabase.co";
 const SB_KEY="sb_publishable_RnYIvufOXIVFaTuHmXNXZw_-7yjJY-B";
 const sb = window.supabase ? window.supabase.createClient(SB_URL, SB_KEY) : null;
-let cloud = { on:false, user:null, profile:null, deptId:null };
+let cloud = { on:false, user:null, profile:null, deptId:null, budgetId:null, budgets:[] };
+async function loadBudgets(){
+  const { data } = await sb.from("budgets").select("*").eq("department_id",cloud.deptId).order("created_at",{ascending:false});
+  cloud.budgets=data||[];
+  const act=cloud.budgets.find(b=>b.is_active)||cloud.budgets[0];
+  cloud.budgetId=act?act.id:null;
+  const sw=$("#budgetSwitch"), lb=$("#budLabel");
+  if(cloud.budgets.length){
+    sw.innerHTML=cloud.budgets.map(b=>`<option value="${b.id}" ${b.id===cloud.budgetId?"selected":""}>${b.name}</option>`).join("");
+    sw.style.display="block"; lb.hidden=false;
+  } else { sw.style.display="none"; lb.hidden=true; }
+  if(act){ state.fy=act.fiscal_year||state.fy; const fyl=$("#fyLab"); if(fyl) fyl.textContent=state.fy; }
+}
+async function setActiveBudget(id){
+  await sb.from("budgets").update({is_active:false}).eq("department_id",cloud.deptId).eq("is_active",true);
+  await sb.from("budgets").update({is_active:true}).eq("id",id);
+}
 
 function gateHTML(kind, extra){
   if(kind==="login") return `<h2>Welcome back</h2>
@@ -1221,7 +1278,9 @@ function showGate(kind, extra){ $("#appRoot").style.display="none"; $("#gate").s
 function showApp(){ $("#gate").style.display="none"; $("#appRoot").style.display="grid"; }
 
 async function fetchAll(){
-  const { data: accts, error } = await sb.from("accounts").select("*, monthly_plans(month, amount), monthly_actuals(month, amount)").eq("department_id",cloud.deptId).order("code");
+  if(!cloud.budgetId){ state.accounts=[]; const { data:purs0 } = await sb.from("purchases").select("*").eq("department_id",cloud.deptId).order("created_at");
+    state.purchases=(purs0||[]).map(p=>({ id:p.id, status:p.status, desc:p.description, type:p.ptype, vendor:p.vendor, code:p.account_code, amount:+p.amount||0, needby:p.need_by||"", lead:p.lead_days||0, notes:p.notes||"" })); return; }
+  const { data: accts, error } = await sb.from("accounts").select("*, monthly_plans(month, amount), monthly_actuals(month, amount)").eq("budget_id",cloud.budgetId).order("code");
   if(error){ toast("Couldn't load data: "+error.message); return; }
   state.accounts = (accts||[]).map(r=>{
     const months=Array(12).fill(0), amonths=Array(12).fill(0);
@@ -1264,21 +1323,27 @@ async function cloudDelPurchase(p){
   const { error } = await sb.from("purchases").delete().eq("id",p.id);
   if(error) toast("Delete failed: "+error.message);
 }
-async function cloudImport(rows, txMap){
+async function cloudImport(rows, txMap, asNew, name){
   if(!cloud.on) return;
-  const payload=rows.map(r=>({ department_id:cloud.deptId, code:r.code, fund:r.fund||null, obj:r.obj||null,
+  if(asNew || !cloud.budgetId){
+    await sb.from("budgets").update({is_active:false}).eq("department_id",cloud.deptId).eq("is_active",true);
+    const { data:nb, error:be } = await sb.from("budgets").insert({ department_id:cloud.deptId, name:name||"New budget", is_active:true }).select("id").single();
+    if(be){ toast("Couldn't create budget: "+be.message); return false; }
+    cloud.budgetId=nb.id;
+  }
+  const payload=rows.map(r=>({ department_id:cloud.deptId, budget_id:cloud.budgetId, code:r.code, fund:r.fund||null, obj:r.obj||null,
     description:r.desc, acct_type:r.acctType, category:r.cat, plan_type:r.plan,
     budget:r.budget, actual:r.actual, encumbered:r.enc }));
-  const { error } = await sb.from("accounts").upsert(payload, { onConflict:"department_id,code" });
+  const { error } = await sb.from("accounts").upsert(payload, { onConflict:"budget_id,code" });
   if(error){ toast("Import failed: "+error.message); return false; }
   if(txMap && Object.keys(txMap).length){
-    const { data: ids } = await sb.from("accounts").select("id,code").eq("department_id",cloud.deptId);
+    const { data: ids } = await sb.from("accounts").select("id,code").eq("budget_id",cloud.budgetId);
     const arows=[];
     (ids||[]).forEach(r=>{ const arr=txMap[r.code]; if(arr) arr.forEach((v,m)=>{ if(Math.abs(v)>=0.005) arows.push({account_id:r.id,month:m,amount:v}); }); });
     if(arows.length){ const { error:e2 } = await sb.from("monthly_actuals").upsert(arows);
       if(e2) toast("Monthly actuals: "+e2.message); }
   }
-  await fetchAll(); return true;
+  await loadBudgets(); await fetchAll(); return true;
 }
 
 async function boot(){
@@ -1290,6 +1355,7 @@ async function boot(){
   if(!prof || !prof.department_id){ showGate("pending", cloud.user.email); return; }
   showGate("loading");
   cloud.on=true; cloud.profile=prof; cloud.deptId=prof.department_id;
+  await loadBudgets();
   state.dept=prof.departments?.name||"Department"; state.fy=prof.departments?.fiscal_year||state.fy;
   if(prof.role==="viewer") document.body.classList.add("viewer");
   if(prof.role==="admin"){
