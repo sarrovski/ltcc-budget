@@ -26,9 +26,11 @@
 .gate .field{position:relative; margin-bottom:11px; text-align:left}
 .gate .field .fic{position:absolute; left:12px; top:50%; transform:translateY(-50%); color:var(--slate2); display:flex}
 .gate .field .fic svg{width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.7; stroke-linecap:round; stroke-linejoin:round}
-.gate input{width:100%; border:1px solid var(--line); background:#fff; border-radius:10px; padding:12px 13px 12px 36px; font-size:14px; outline:none; margin:0; color:var(--ink); transition:border-color .12s, box-shadow .12s}
-.gate input::placeholder{color:var(--slate2)}
-.gate input:focus{border-color:var(--pine); box-shadow:0 0 0 3px var(--pine-bg)}
+.gate input{width:100%; border:1.5px solid #B9C9BF; background:#F3F7F4; border-radius:10px; padding:12px 13px 12px 36px; font-size:14px; outline:none; margin:0; color:var(--ink); box-shadow:inset 0 1px 3px rgba(15,42,30,.07); transition:border-color .12s, box-shadow .12s, background .12s}
+.gate input::placeholder{color:#7B8A80}
+.gate input:hover{border-color:#9AB0A2}
+.gate input:focus{border-color:var(--pine); background:#fff; box-shadow:inset 0 1px 2px rgba(15,42,30,.04), 0 0 0 3px var(--pine-bg)}
+.gate .field .fic{color:#6E7F74}
 .gate .btn.primary{width:100%; padding:12px; font-size:13.5px; justify-content:center; background:linear-gradient(180deg,#1B7A4C,var(--pine)); border-color:var(--pine-d); box-shadow:0 6px 16px rgba(20,97,60,.32), 0 1px 0 rgba(255,255,255,.18) inset; letter-spacing:.01em; margin-top:3px}
 .gate .btn.primary:hover{background:linear-gradient(180deg,#1F8552,var(--pine))}
 .gate .divider{display:flex; align-items:center; gap:10px; margin:15px 0 11px; color:var(--slate2); font-size:10.5px; letter-spacing:.12em; text-transform:uppercase; font-weight:600}
