@@ -89,6 +89,14 @@ nav{display:flex; flex-direction:column; gap:2px}
 #nav a.on{background:var(--teal); color:#fff}
 #nav a.on .ic{opacity:1}
 .side .foot{margin-top:auto; font-size:10.5px; color:#6C9280; line-height:1.5}
+.side .me{margin-top:auto; border-top:1px solid rgba(255,255,255,.08); padding-top:14px; display:none; align-items:center; gap:10px}
+.side .me .avatar{background:rgba(255,255,255,.12); color:#fff; width:32px; height:32px; margin:0}
+.side .me .who{flex:1; min-width:0}
+.side .me .who .n{font-size:12.5px; font-weight:600; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis}
+.side .me .who .r{font-size:10px; letter-spacing:.09em; text-transform:uppercase; color:var(--gold); font-weight:700}
+.btn-out{border:1px solid rgba(255,255,255,.16); background:rgba(255,255,255,.05); color:#D6E4DC; border-radius:8px; width:32px; height:32px; display:inline-flex; align-items:center; justify-content:center; flex:none; transition:background .12s,border-color .12s,color .12s}
+.btn-out:hover{background:rgba(180,35,47,.18); border-color:rgba(255,120,130,.45); color:#FFB4BA}
+.btn-out svg{width:15px; height:15px; stroke:currentColor; fill:none; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
 
 .main{min-width:0; padding:26px 30px 60px}
 .head{display:flex; align-items:flex-end; justify-content:space-between; gap:16px; margin-bottom:22px; flex-wrap:wrap}
@@ -371,9 +379,16 @@ tbody tr{transition:background .1s}
       <div class="nav-eyebrow" style="margin-top:16px">Data</div>
       <a data-view="import"><span class="ic"><svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v11M8 10l4 4 4-4"/><path d="M4 17v2a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2v-2"/></svg></span> Import Report</a>
     </nav>
-    <div class="foot">
+    <div class="foot" id="sideFoot">
       Yellow fields are yours to edit.<br/>Everything else is calculated.<br/><br/>
       Signed-in mode: data saves securely to the college database.
+    </div>
+    <div class="me" id="meBlock">
+      <span class="avatar" id="meAvatar">?</span>
+      <div class="who"><div class="n" id="meName">—</div><div class="r" id="meRole"></div></div>
+      <button class="btn-out" id="logoutBtn" title="Sign out" aria-label="Sign out">
+        <svg viewBox="0 0 24 24"><path d="M9 21H6a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h3"/><path d="M16 17l5-5-5-5M21 12H9"/></svg>
+      </button>
     </div>
   </aside>
   <main class="main" id="main"></main>
@@ -1138,7 +1153,7 @@ async function cloudImport(rows){
 }
 
 async function boot(){
-  if(!sb){ load(); $("#deptIn").value=state.dept; render(); return; }   // offline fallback
+  if(!sb){ load(); showApp(); $("#deptIn").value=state.dept; render(); return; }   // offline fallback
   const { data:{ session } } = await sb.auth.getSession();
   if(!session){ showGate("login"); return; }
   cloud.user=session.user;
@@ -1148,6 +1163,11 @@ async function boot(){
   state.dept=prof.departments?.name||"Department"; state.fy=prof.departments?.fiscal_year||state.fy;
   if(prof.role==="viewer") document.body.classList.add("viewer");
   if(prof.role==="admin"){ $("#navAdmin").hidden=false; $("#navAdminHead").hidden=false; await fetchAdmin(); }
+  const nm=prof.full_name||cloud.user.email;
+  $("#meName").textContent=nm; $("#meName").title=cloud.user.email;
+  $("#meRole").textContent=prof.role;
+  $("#meAvatar").textContent=initials({full_name:prof.full_name,email:cloud.user.email});
+  $("#sideFoot").style.display="none"; $("#meBlock").style.display="flex";
   await fetchAll();
   showApp();
   const di=$("#deptIn"); di.value=state.dept; di.readOnly=true;
@@ -1172,6 +1192,10 @@ document.addEventListener("click", async e=>{
     if(error) msg.classList.add("err");
   }
   if(e.target.id==="gOut"){ await sb.auth.signOut(); showGate("login"); }
+  if(e.target.closest && e.target.closest("#logoutBtn")){
+    await sb.auth.signOut(); cloud={on:false,user:null,profile:null,deptId:null};
+    document.body.classList.remove("viewer"); location.reload();
+  }
 });
 if(sb) sb.auth.onAuthStateChange((ev)=>{ if(ev==="SIGNED_IN"||ev==="TOKEN_REFRESHED"){ if(!cloud.on) boot(); } });
 boot();
